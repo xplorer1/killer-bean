@@ -1,6 +1,6 @@
 # Bean Blaster Setup
 
-Bean Blaster targets Unity 2022.3 LTS. The pinned development editor is **Unity 2022.3.62f3**, the final public 2022 LTS patch compatible with Unity Personal. Later 2022.3 Extended LTS releases require a paid Unity Industry or Enterprise license and must not be used for this project.
+Bean Blaster targets **Android for its first release**, with iOS deferred until Android is complete and accepted. The pinned development editor is **Unity 2022.3.62f3**, the final public 2022 LTS patch compatible with Unity Personal. Later 2022.3 Extended LTS releases require a paid Unity Industry or Enterprise license and must not be used for this project. `ANDROID_FIRST_RELEASE.md` overrides conflicting desktop-platform and input statements in the original specification.
 
 > Current workspace status: the project is being constructed from `GAME_SPEC.md`. The full setup tool and playable scenes do not exist yet. This README will be expanded as each implementation phase passes its verification gate.
 
@@ -24,6 +24,16 @@ These steps cannot be assumed from source generation alone:
 2. In **Edit → Project Settings → Player**, set **Active Input Handling** to **Input System Package (New)**.
 3. Import **TMP Essentials** when TextMesh Pro prompts for them, or use **Window → TextMeshPro → Import TMP Essential Resources**.
 
+## Android editor modules
+
+The current Unity 2022.3.62f3 installation does **not** include Android Build Support. Before the first device build, add these modules to that exact editor version through Unity Hub:
+
+- Android Build Support
+- Android SDK & NDK Tools
+- OpenJDK
+
+Do not install another Unity editor version just to obtain these modules. The connected Samsung device and the local Android emulator are already visible through `adb`; the missing Unity module is the present build blocker.
+
 ## Full setup
 
 When the Editor setup tooling is implemented, run:
@@ -33,6 +43,10 @@ When the Editor setup tooling is implemented, run:
 The command will generate project settings, sprites, data assets, prefabs, UI, scenes, and Build Settings. It must be safe to run repeatedly. Until the setup-tool phases are complete, this menu command will not be available.
 
 ## Controls
+
+The Android release uses landscape touch controls: a left movement stick, a right aim/fire stick, Jump, previous/next weapon, and Pause. The right stick fires while held and also activates airborne hover. This layout is designed for simultaneous movement, aiming/firing, and jumping.
+
+The following bindings remain development controls for testing in the Unity Editor:
 
 | Action | Keyboard and mouse | Gamepad |
 |---|---|---|
@@ -63,10 +77,14 @@ These decisions resolve details that are contradictory or not fully determined i
 12. **Generated content ownership:** the setup tool owns assets at its documented stable generated paths. It updates those assets on rerun; it does not delete unrelated user-created assets.
 13. **Player respawn:** respawning restores the player object in place rather than reloading the scene, which is required to keep already-killed enemies dead.
 14. **Direct scene play:** `Bootstrap` creates persistent services when a level is opened directly. Scene-specific references remain serialized on `LevelManager` and are not discovered every frame.
+15. **Platform correction:** `ANDROID_FIRST_RELEASE.md` is authoritative wherever the original specification names desktop release targets or desktop-first input. Android is first; iOS follows. Desktop builds are not release deliverables.
 
 ## Manual acceptance checklist
 
-- [ ] Fresh project → Run Full Setup → open `MainMenu` → Play → game runs with no console errors.
+- [ ] Fresh project → Run Full Setup → build an Android development APK → install it on the connected phone → game runs with no errors.
+- [ ] Landscape UI respects the device safe area and display cutout.
+- [ ] Multitouch supports moving, aiming/firing, and jumping at the same time.
+- [ ] Force-stop and relaunch preserves all already-saved progression.
 - [ ] Player can triple jump; a fourth jump is impossible until landing.
 - [ ] Holding Fire in the air slows the fall to a gentle drift; releasing restores normal gravity.
 - [ ] Aiming behind the player flips the body; the gun is never upside down.
