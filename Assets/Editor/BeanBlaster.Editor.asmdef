@@ -2,7 +2,9 @@
   "name": "BeanBlaster.Editor",
   "rootNamespace": "BeanBlaster.Editor",
   "references": [
-    "BeanBlaster.Runtime"
+    "BeanBlaster.Runtime",
+    "Unity.InputSystem",
+    "Unity.ugui"
   ],
   "includePlatforms": [
     "Editor"
