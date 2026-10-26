@@ -25,6 +25,10 @@ namespace BeanBlaster.Combat
         [SerializeField, Min(0f)] private float swapCooldown = 0.1f;
         [SerializeField, Min(0f)] private float dualMuzzleOffset = 0.08f;
 
+        [Header("Development Arena")]
+        [SerializeField] private bool developmentAllWeaponsUnlocked;
+        [SerializeField] private bool developmentUnlimitedAmmo;
+
         private WeaponData currentWeapon;
         private float fireCooldownRemaining;
         private bool emptyClickedThisPress;
@@ -119,7 +123,7 @@ namespace BeanBlaster.Combat
         private bool EquipInternal(string weaponId, bool persistSelection)
         {
             WeaponData weapon = database == null ? null : database.GetById(weaponId);
-            if (weapon == null || !EconomyService.IsOwned(weapon.Id))
+            if (weapon == null || !IsWeaponOwned(weapon.Id))
             {
                 return false;
             }
@@ -182,14 +186,14 @@ namespace BeanBlaster.Combat
             return database == null
                 ? new List<WeaponData>()
                 : database.All
-                    .Where(weapon => weapon != null && EconomyService.IsOwned(weapon.Id))
+                    .Where(weapon => weapon != null && IsWeaponOwned(weapon.Id))
                     .OrderBy(weapon => weapon.ShopSlot)
                     .ToList();
         }
 
         private void TryFire()
         {
-            if (currentWeapon.UsesAmmo && EconomyService.GetAmmo(currentWeapon.Id) < currentWeapon.AmmoPerShot)
+            if (UsesFiniteAmmo(currentWeapon) && EconomyService.GetAmmo(currentWeapon.Id) < currentWeapon.AmmoPerShot)
             {
                 RaiseEmptyClickOnce();
                 return;
@@ -214,7 +218,7 @@ namespace BeanBlaster.Combat
                 return;
             }
 
-            if (currentWeapon.UsesAmmo && !EconomyService.TryConsumeAmmo(currentWeapon.Id, currentWeapon.AmmoPerShot))
+            if (UsesFiniteAmmo(currentWeapon) && !EconomyService.TryConsumeAmmo(currentWeapon.Id, currentWeapon.AmmoPerShot))
             {
                 projectilePool.Return(projectile);
                 RaiseEmptyClickOnce();
@@ -234,7 +238,7 @@ namespace BeanBlaster.Combat
             projectile.transform.SetPositionAndRotation(spawnPosition, Quaternion.Euler(0f, 0f, angle));
             if (!projectile.Launch(currentWeapon, aimDirection, Team.Player, ownerCollider))
             {
-                if (currentWeapon.UsesAmmo)
+                if (UsesFiniteAmmo(currentWeapon))
                 {
                     EconomyService.AddAmmo(currentWeapon.Id, currentWeapon.AmmoPerShot);
                 }
@@ -271,8 +275,21 @@ namespace BeanBlaster.Combat
         {
             if (currentWeapon != null)
             {
-                AmmoDisplayChanged?.Invoke(currentWeapon.Id, EconomyService.GetAmmo(currentWeapon.Id));
+                int amount = UsesFiniteAmmo(currentWeapon)
+                    ? EconomyService.GetAmmo(currentWeapon.Id)
+                    : int.MaxValue;
+                AmmoDisplayChanged?.Invoke(currentWeapon.Id, amount);
             }
+        }
+
+        private bool IsWeaponOwned(string weaponId)
+        {
+            return developmentAllWeaponsUnlocked || EconomyService.IsOwned(weaponId);
+        }
+
+        private bool UsesFiniteAmmo(WeaponData weapon)
+        {
+            return weapon != null && weapon.UsesAmmo && !developmentUnlimitedAmmo;
         }
 
         private void OnValidate()

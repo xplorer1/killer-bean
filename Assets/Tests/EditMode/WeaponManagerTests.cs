@@ -83,6 +83,16 @@ namespace BeanBlaster.Tests.EditMode
         }
 
         [Test]
+        public void DevelopmentArenaCanExposeRosterWithoutMutatingOwnership()
+        {
+            SetField("developmentAllWeaponsUnlocked", true);
+
+            Assert.That(manager.Equip("fire_bomb"), Is.True);
+            Assert.That(manager.CurrentWeapon, Is.SameAs(napalm));
+            Assert.That(SaveSystem.Current.IsUnlocked("fire_bomb"), Is.False);
+        }
+
+        [Test]
         public void EquipOwnedWeaponUpdatesSelectionAndRaisesEvents()
         {
             SaveSystem.Current.Unlock("magnum");
