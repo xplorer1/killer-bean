@@ -18,6 +18,8 @@ namespace BeanBlaster.Enemies
         [SerializeField] private SpriteRenderer bodyRenderer;
         [SerializeField] private Transform player;
         [SerializeField] private LevelManager levelManager;
+        [SerializeField] private Transform fireSocket;
+        [SerializeField] private EnemyProjectilePool projectilePool;
         [SerializeField] private LayerMask groundLayerMask = 1 << 6;
         [SerializeField] private LayerMask playerLayerMask = 1 << 7;
         [SerializeField] private float leftBound;
@@ -237,7 +239,17 @@ namespace BeanBlaster.Enemies
 
         private void CommitAttack()
         {
-            if (!stats.UsesRangedAttack)
+            if (stats.UsesRangedAttack)
+            {
+                EnemyProjectile projectile = projectilePool == null ? null : projectilePool.Get();
+                if (projectile != null && player != null)
+                {
+                    Vector2 origin = fireSocket == null ? transform.position : fireSocket.position;
+                    projectile.transform.position = origin;
+                    projectile.Launch((Vector2)player.position - origin, stats.ProjectileSpeed, stats.AttackDamage, bodyCollider);
+                }
+            }
+            else
             {
                 Vector2 centre = (Vector2)transform.position + new Vector2(facing * stats.AttackRange * 0.5f, 0f);
                 Vector2 size = new Vector2(stats.AttackRange, stats.Size.y);
