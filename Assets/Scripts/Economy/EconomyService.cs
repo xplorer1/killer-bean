@@ -178,8 +178,15 @@ namespace BeanBlaster.Economy
 
         private static void EnsureDependencies()
         {
-            weaponDatabase ??= Resources.Load<WeaponDatabase>("WeaponDatabase");
-            gameConfig ??= Resources.Load<GameConfig>("GameConfig");
+            if (weaponDatabase == null)
+            {
+                weaponDatabase = Resources.Load<WeaponDatabase>("WeaponDatabase");
+            }
+
+            if (gameConfig == null)
+            {
+                gameConfig = Resources.Load<GameConfig>("GameConfig");
+            }
         }
     }
 }

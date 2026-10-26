@@ -73,11 +73,30 @@ namespace BeanBlaster.Player
 
         private void Awake()
         {
-            body ??= GetComponent<Rigidbody2D>();
-            bodyCollider ??= GetComponent<CapsuleCollider2D>();
-            bodyRenderer ??= GetComponent<SpriteRenderer>();
-            health ??= GetComponent<Health>();
-            input ??= GetComponent<PlayerInputReader>();
+            if (body == null)
+            {
+                body = GetComponent<Rigidbody2D>();
+            }
+
+            if (bodyCollider == null)
+            {
+                bodyCollider = GetComponent<CapsuleCollider2D>();
+            }
+
+            if (bodyRenderer == null)
+            {
+                bodyRenderer = GetComponent<SpriteRenderer>();
+            }
+
+            if (health == null)
+            {
+                health = GetComponent<Health>();
+            }
+
+            if (input == null)
+            {
+                input = GetComponent<PlayerInputReader>();
+            }
 
             body.gravityScale = baseGravityScale;
             body.freezeRotation = true;

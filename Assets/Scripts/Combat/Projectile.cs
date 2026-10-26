@@ -24,10 +24,30 @@ namespace BeanBlaster.Combat
 
         private void Awake()
         {
-            body ??= GetComponent<Rigidbody2D>();
-            projectileCollider ??= GetComponent<Collider2D>();
-            spriteRenderer ??= GetComponent<SpriteRenderer>();
-            trailRenderer ??= GetComponent<TrailRenderer>();
+            EnsureComponents();
+        }
+
+        private void EnsureComponents()
+        {
+            if (body == null)
+            {
+                body = GetComponent<Rigidbody2D>();
+            }
+
+            if (projectileCollider == null)
+            {
+                projectileCollider = GetComponent<Collider2D>();
+            }
+
+            if (spriteRenderer == null)
+            {
+                spriteRenderer = GetComponent<SpriteRenderer>();
+            }
+
+            if (trailRenderer == null)
+            {
+                trailRenderer = GetComponent<TrailRenderer>();
+            }
             body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
             body.interpolation = RigidbodyInterpolation2D.Interpolate;
         }
@@ -76,6 +96,7 @@ namespace BeanBlaster.Combat
                 return false;
             }
 
+            EnsureComponents();
             ResetForReuse();
             weapon = data;
             sourceTeam = team;

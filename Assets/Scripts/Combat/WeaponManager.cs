@@ -39,10 +39,25 @@ namespace BeanBlaster.Combat
 
         private void Awake()
         {
-            database ??= Resources.Load<WeaponDatabase>("WeaponDatabase");
-            input ??= GetComponent<PlayerInputReader>();
-            player ??= GetComponent<PlayerController2D>();
-            ownerCollider ??= GetComponent<Collider2D>();
+            if (database == null)
+            {
+                database = Resources.Load<WeaponDatabase>("WeaponDatabase");
+            }
+
+            if (input == null)
+            {
+                input = GetComponent<PlayerInputReader>();
+            }
+
+            if (player == null)
+            {
+                player = GetComponent<PlayerController2D>();
+            }
+
+            if (ownerCollider == null)
+            {
+                ownerCollider = GetComponent<Collider2D>();
+            }
         }
 
         private void OnEnable()
