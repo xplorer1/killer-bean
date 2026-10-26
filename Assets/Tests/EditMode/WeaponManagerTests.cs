@@ -20,6 +20,9 @@ namespace BeanBlaster.Tests.EditMode
         private GameConfig config;
         private WeaponData pistol;
         private WeaponData magnum;
+        private WeaponData grenade;
+        private WeaponData laser;
+        private WeaponData napalm;
 
         [SetUp]
         public void SetUp()
@@ -30,13 +33,19 @@ namespace BeanBlaster.Tests.EditMode
             SaveSystem.SetValidationDataForTests(new Dictionary<string, int>
             {
                 ["pistol_dual"] = int.MaxValue,
-                ["magnum"] = 90
+                ["magnum"] = 90,
+                ["explosive_gl"] = 30,
+                ["beam_splitter"] = 150,
+                ["fire_bomb"] = 15
             }, 3);
 
             pistol = EconomyServiceTests.CreateWeapon("pistol_dual", 0, false, 0, 0, 0, 0);
             magnum = EconomyServiceTests.CreateWeapon("magnum", 2500, true, 1, 30, 90, 30);
+            grenade = EconomyServiceTests.CreateWeapon("explosive_gl", 7500, true, 1, 10, 30, 10, 400);
+            laser = EconomyServiceTests.CreateWeapon("beam_splitter", 15000, true, 1, 50, 150, 50, 500);
+            napalm = EconomyServiceTests.CreateWeapon("fire_bomb", 20000, true, 1, 5, 15, 5, 800);
             database = ScriptableObject.CreateInstance<WeaponDatabase>();
-            EconomyServiceTests.SetField(database, "weapons", new List<WeaponData> { pistol, magnum });
+            EconomyServiceTests.SetField(database, "weapons", new List<WeaponData> { pistol, magnum, grenade, laser, napalm });
             config = ScriptableObject.CreateInstance<GameConfig>();
             EconomyService.Initialize(database, config);
             SaveSystem.Load();
@@ -53,6 +62,9 @@ namespace BeanBlaster.Tests.EditMode
             Object.DestroyImmediate(managerObject);
             Object.DestroyImmediate(pistol);
             Object.DestroyImmediate(magnum);
+            Object.DestroyImmediate(grenade);
+            Object.DestroyImmediate(laser);
+            Object.DestroyImmediate(napalm);
             Object.DestroyImmediate(database);
             Object.DestroyImmediate(config);
             SaveSystem.ClearTestOverrides();
@@ -141,6 +153,59 @@ namespace BeanBlaster.Tests.EditMode
             Object.DestroyImmediate(projectilePrefabObject);
             Object.DestroyImmediate(poolObject);
             Object.DestroyImmediate(socketObject);
+        }
+
+        [Test]
+        public void EverySpecialWeaponConsumesExactlyOneRoundPerShot()
+        {
+            GameObject projectilePrefabObject = new GameObject("Shared Projectile Prefab");
+            projectilePrefabObject.AddComponent<Rigidbody2D>();
+            projectilePrefabObject.AddComponent<BoxCollider2D>();
+            projectilePrefabObject.AddComponent<Projectile>();
+            GameObject poolObject = new GameObject("Projectile Pool");
+            ProjectilePool pool = poolObject.AddComponent<ProjectilePool>();
+            GameObject socketObject = new GameObject("Fire Socket");
+            PlayerInputReader input = managerObject.AddComponent<PlayerInputReader>();
+            SetField("projectilePool", pool);
+            SetField("fireSocket", socketObject.transform);
+            SetField("input", input);
+
+            WeaponData[] weapons = { magnum, grenade, laser, napalm };
+            AmmoType[] ammoTypes = { AmmoType.Piercing, AmmoType.Explosive, AmmoType.Beam, AmmoType.Incendiary };
+            for (int i = 0; i < weapons.Length; i++)
+            {
+                WeaponData weapon = weapons[i];
+                EconomyServiceTests.SetField(weapon, "projectilePrefab", projectilePrefabObject);
+                EconomyServiceTests.SetField(weapon, "ammoType", ammoTypes[i]);
+                EconomyServiceTests.SetField(weapon, "projectileSpeed", 10f);
+                EconomyServiceTests.SetField(weapon, "projectileLifetime", 1f);
+                SaveSystem.Current.Unlock(weapon.Id);
+                SaveSystem.Current.SetAmmo(weapon.Id, 5);
+                SetField("currentWeapon", weapon);
+
+                InvokeTryFire();
+
+                Assert.That(EconomyService.GetAmmo(weapon.Id), Is.EqualTo(4), weapon.Id);
+            }
+
+            Object.DestroyImmediate(projectilePrefabObject);
+            Object.DestroyImmediate(poolObject);
+            Object.DestroyImmediate(socketObject);
+        }
+
+        [Test]
+        public void EmptySpecialWeaponRaisesOneEmptyClickUntilTriggerRelease()
+        {
+            SaveSystem.Current.Unlock("magnum");
+            SaveSystem.Current.SetAmmo("magnum", 0);
+            SetField("currentWeapon", magnum);
+            int emptyClicks = 0;
+            manager.EmptyClicked += () => emptyClicks++;
+
+            InvokeTryFire();
+            InvokeTryFire();
+
+            Assert.That(emptyClicks, Is.EqualTo(1));
         }
 
         private void SetField(string name, object value)
