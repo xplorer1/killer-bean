@@ -19,9 +19,8 @@ namespace BeanBlaster.Combat
         [SerializeField] private ExplosionEffect explosionEffectPrefab;
         [SerializeField, Min(0f)] private float grenadeShakeAmplitude = 0.25f;
         [SerializeField, Min(0f)] private float grenadeShakeDuration = 0.2f;
-        [SerializeField, Min(0f)] private float beamTrailTime = 0.12f;
-        [SerializeField, Min(0f)] private float mainBeamTrailWidth = 0.1f;
-        [SerializeField, Min(0f)] private float splitBeamTrailWidth = 0.06f;
+        [SerializeField, Min(0f)] private float beamTrailTime = 0.08f;
+        [SerializeField, Min(0f)] private float beamTrailWidth = 0.08f;
 
         private ProjectilePool pool;
         private WeaponData weapon;
@@ -34,6 +33,7 @@ namespace BeanBlaster.Combat
         private bool launched;
         private bool isSplitBeam;
         private float shotDamage;
+        private float shotKnockback;
 
         public int PrefabKey { get; private set; }
         public bool IsLaunched => launched;
@@ -132,6 +132,7 @@ namespace BeanBlaster.Combat
             launched = true;
             isSplitBeam = splitBeam;
             shotDamage = splitBeam ? data.SubBeamDamage : data.Damage;
+            shotKnockback = splitBeam ? data.KnockbackForce * 0.5f : data.KnockbackForce;
             launchDirection = direction.normalized;
             transform.right = launchDirection;
             body.gravityScale = data.ProjectileGravityScale;
@@ -151,7 +152,7 @@ namespace BeanBlaster.Combat
                 trailRenderer.Clear();
                 if (data.AmmoType == AmmoType.Beam)
                 {
-                    ConfigureBeamTrail(data.ProjectileColor, splitBeam);
+                    ConfigureBeamTrail(data.ProjectileColor);
                 }
                 trailRenderer.emitting = true;
             }
@@ -159,10 +160,10 @@ namespace BeanBlaster.Combat
             return true;
         }
 
-        private void ConfigureBeamTrail(Color color, bool splitBeam)
+        private void ConfigureBeamTrail(Color color)
         {
             trailRenderer.time = beamTrailTime;
-            trailRenderer.startWidth = splitBeam ? splitBeamTrailWidth : mainBeamTrailWidth;
+            trailRenderer.startWidth = beamTrailWidth;
             trailRenderer.endWidth = 0f;
             trailRenderer.startColor = color;
             trailRenderer.endColor = new Color(color.r, color.g, color.b, 0f);
@@ -179,6 +180,7 @@ namespace BeanBlaster.Combat
             launched = false;
             isSplitBeam = false;
             shotDamage = 0f;
+            shotKnockback = 0f;
             weapon = null;
             ownerCollider = null;
             launchDirection = Vector2.zero;
@@ -279,13 +281,14 @@ namespace BeanBlaster.Combat
                 ? collisionNormal.normalized
                 : -launchDirection;
             Vector2 reflected = Vector2.Reflect(launchDirection, normal).normalized;
+            Vector2 spawnPosition = (Vector2)transform.position + (normal * 0.05f);
             int count = Mathf.Max(1, weapon.SplitCount);
             float centre = (count - 1) * 0.5f;
             for (int i = 0; i < count; i++)
             {
                 float angle = (i - centre) * weapon.SplitAngle;
                 Vector2 direction = Quaternion.Euler(0f, 0f, angle) * reflected;
-                BeamSplit?.Invoke(transform.position, direction);
+                BeamSplit?.Invoke(spawnPosition, direction);
 
                 Projectile child = pool != null ? pool.GetByPrefabKey(PrefabKey) : null;
                 if (child == null)
@@ -293,7 +296,7 @@ namespace BeanBlaster.Combat
                     continue;
                 }
 
-                child.transform.position = transform.position + (Vector3)(direction * 0.05f);
+                child.transform.position = spawnPosition;
                 child.LaunchInternal(weapon, direction, sourceTeam, ownerCollider, true);
             }
         }
@@ -337,7 +340,7 @@ namespace BeanBlaster.Combat
                 shotDamage,
                 transform.position,
                 launchDirection.sqrMagnitude > 0f ? launchDirection : (Vector2)transform.right,
-                weapon.KnockbackForce,
+                shotKnockback,
                 sourceTeam,
                 DamageType.Bullet));
         }

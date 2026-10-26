@@ -185,12 +185,19 @@ namespace BeanBlaster.Tests.EditMode
             BoxCollider2D groundCollider = ground.AddComponent<BoxCollider2D>();
             Projectile main = pool.Get(prefab);
             int splitEvents = 0;
-            main.BeamSplit += (_, __) => splitEvents++;
+            Vector2 splitOrigin = Vector2.zero;
+            main.BeamSplit += (origin, _) =>
+            {
+                splitEvents++;
+                splitOrigin = origin;
+            };
             Assert.That(main.Launch(laser, new Vector2(1f, -1f), Team.Player, null), Is.True);
 
             main.ProcessBeamCollision(groundCollider, Vector2.up);
 
             Assert.That(splitEvents, Is.EqualTo(3));
+            Assert.That(splitOrigin.x, Is.EqualTo(0f).Within(0.001f));
+            Assert.That(splitOrigin.y, Is.EqualTo(0.05f).Within(0.001f));
             int launchedCount = 0;
             foreach (Projectile projectile in poolObject.GetComponentsInChildren<Projectile>(true))
             {
@@ -202,6 +209,45 @@ namespace BeanBlaster.Tests.EditMode
 
             Assert.That(launchedCount, Is.EqualTo(3));
             Object.DestroyImmediate(ground);
+            Object.DestroyImmediate(laser);
+        }
+
+        [Test]
+        public void BeamProjectile_UsesExactMainAndSubBeamDamage()
+        {
+            SetField("maximumPerPrefab", 5);
+            WeaponData laser = CreateLaser();
+            GameObject ground = new GameObject("Ground");
+            ground.layer = 6;
+            BoxCollider2D groundCollider = ground.AddComponent<BoxCollider2D>();
+            GameObject mainTarget = CreateEnemy("Main Target");
+            GameObject splitTarget = CreateEnemy("Split Target");
+
+            Projectile main = pool.Get(prefab);
+            Assert.That(main.Launch(laser, Vector2.right, Team.Player, null), Is.True);
+            main.ProcessBeamCollision(mainTarget.GetComponent<Collider2D>(), Vector2.left);
+            Assert.That(mainTarget.GetComponent<Health>().CurrentHealth, Is.EqualTo(60f));
+
+            main = pool.Get(prefab);
+            Assert.That(main.Launch(laser, Vector2.right, Team.Player, null), Is.True);
+            main.ProcessBeamCollision(groundCollider, Vector2.left);
+            Projectile child = null;
+            foreach (Projectile projectile in poolObject.GetComponentsInChildren<Projectile>(true))
+            {
+                if (projectile.IsLaunched)
+                {
+                    child = projectile;
+                    break;
+                }
+            }
+
+            Assert.That(child, Is.Not.Null);
+            child.ProcessBeamCollision(splitTarget.GetComponent<Collider2D>(), Vector2.left);
+            Assert.That(splitTarget.GetComponent<Health>().CurrentHealth, Is.EqualTo(80f));
+
+            Object.DestroyImmediate(ground);
+            Object.DestroyImmediate(mainTarget);
+            Object.DestroyImmediate(splitTarget);
             Object.DestroyImmediate(laser);
         }
 
@@ -263,8 +309,8 @@ namespace BeanBlaster.Tests.EditMode
 
             Assert.That(prefab.Launch(laser, Vector2.right, Team.Player, null), Is.True);
             Assert.That(trail.emitting, Is.True);
-            Assert.That(trail.time, Is.EqualTo(0.12f).Within(0.001f));
-            Assert.That(trail.startWidth, Is.EqualTo(0.1f).Within(0.001f));
+            Assert.That(trail.time, Is.EqualTo(0.08f).Within(0.001f));
+            Assert.That(trail.startWidth, Is.EqualTo(0.08f).Within(0.001f));
             Assert.That(trail.endWidth, Is.Zero.Within(0.001f));
 
             prefab.ResetForReuse();
@@ -306,12 +352,13 @@ namespace BeanBlaster.Tests.EditMode
             WeaponData weapon = ScriptableObject.CreateInstance<WeaponData>();
             SetWeaponField(weapon, "id", "laser_splitter");
             SetWeaponField(weapon, "ammoType", AmmoType.Beam);
-            SetWeaponField(weapon, "damage", 75f);
-            SetWeaponField(weapon, "projectileSpeed", 60f);
+            SetWeaponField(weapon, "damage", 40f);
+            SetWeaponField(weapon, "projectileSpeed", 40f);
             SetWeaponField(weapon, "projectileLifetime", 1.5f);
+            SetWeaponField(weapon, "knockbackForce", 3f);
             SetWeaponField(weapon, "splitCount", 3);
             SetWeaponField(weapon, "splitAngle", 25f);
-            SetWeaponField(weapon, "subBeamDamage", 40f);
+            SetWeaponField(weapon, "subBeamDamage", 20f);
             SetWeaponField(weapon, "subBeamLifetime", 0.75f);
             return weapon;
         }
