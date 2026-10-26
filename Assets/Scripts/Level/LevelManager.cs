@@ -1,6 +1,7 @@
 using System.Collections;
 using BeanBlaster.Player;
 using BeanBlaster.Save;
+using BeanBlaster.Enemies;
 using UnityEngine;
 
 namespace BeanBlaster.Level
@@ -19,6 +20,7 @@ namespace BeanBlaster.Level
         public int LevelIndex => levelIndex;
         public float KillPlaneY => killPlaneY;
         public int DeathsThisAttempt { get; private set; }
+        public int KillsThisAttempt { get; private set; }
 
         private void Awake()
         {
@@ -45,6 +47,15 @@ namespace BeanBlaster.Level
             respawnPending = true;
             SaveSystem.Save();
             StartCoroutine(RespawnAfterDelay(player));
+        }
+
+        /// <summary>Records one enemy death after the enemy has applied its own one-shot guard.</summary>
+        public void OnEnemyKilled(EnemyAI2D enemy)
+        {
+            if (enemy != null)
+            {
+                KillsThisAttempt++;
+            }
         }
 
         private IEnumerator RespawnAfterDelay(PlayerController2D player)
