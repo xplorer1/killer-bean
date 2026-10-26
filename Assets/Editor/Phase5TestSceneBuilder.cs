@@ -51,11 +51,11 @@ namespace BeanBlaster.Editor
             CreateKillPlane(manager);
             ProjectilePool projectilePool = new GameObject("ProjectilePool").AddComponent<ProjectilePool>();
             PlayerBuild player = CreatePlayer(square, spawn.transform.position, manager);
-            CreatePlayerWeaponManager(player, combatAssets, projectilePool);
+            WeaponManager weaponManager = CreatePlayerWeaponManager(player, combatAssets, projectilePool);
             CreateCombatTarget(square, "Target A", new Vector2(4f, 0.25f));
             CreateCombatTarget(square, "Target B", new Vector2(6.5f, 0.25f));
             CreateCombatTarget(square, "Target C", new Vector2(9f, 0.25f));
-            CreateTouchHud(square, player.input);
+            CreateTouchHud(square, player.input, weaponManager);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -157,7 +157,7 @@ namespace BeanBlaster.Editor
             };
         }
 
-        private static void CreateTouchHud(Sprite sprite, PlayerInputReader playerInput)
+        private static void CreateTouchHud(Sprite sprite, PlayerInputReader playerInput, WeaponManager weaponManager)
         {
             GameObject canvasObject = new GameObject("MobileHUD", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             Canvas canvas = canvasObject.GetComponent<Canvas>();
@@ -185,6 +185,7 @@ namespace BeanBlaster.Editor
             CreateButton(safeArea, sprite, mobileInput, "NEXT", new Vector2(-170f, -95f), new Vector2(150f, 90f), true, TouchActionButtonRole.NextWeapon);
             CreateButton(safeArea, sprite, mobileInput, "II", new Vector2(-75f, -70f), new Vector2(100f, 100f), true, TouchActionButtonRole.Pause);
             CreateInstruction(safeArea);
+            CreateWeaponLabel(safeArea, weaponManager);
 
             GameObject eventSystemObject = new GameObject("EventSystem", typeof(EventSystem));
             InputSystemUIInputModule module = eventSystemObject.AddComponent<InputSystemUIInputModule>();
@@ -356,7 +357,7 @@ namespace BeanBlaster.Editor
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        private static void CreatePlayerWeaponManager(
+        private static WeaponManager CreatePlayerWeaponManager(
             PlayerBuild player,
             CombatAssets assets,
             ProjectilePool projectilePool)
@@ -371,6 +372,7 @@ namespace BeanBlaster.Editor
             SetObjectReference(weaponManager, "ownerCollider", player.ownerCollider);
             SetBoolean(weaponManager, "developmentAllWeaponsUnlocked", true);
             SetBoolean(weaponManager, "developmentUnlimitedAmmo", true);
+            return weaponManager;
         }
 
         private static void CreateCombatTarget(Sprite sprite, string name, Vector2 position)
@@ -424,6 +426,27 @@ namespace BeanBlaster.Editor
             text.alignment = TextAnchor.MiddleCenter;
             text.color = Color.white;
             text.raycastTarget = false;
+        }
+
+        private static void CreateWeaponLabel(RectTransform parent, WeaponManager weaponManager)
+        {
+            GameObject textObject = new GameObject("Weapon Readout", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text), typeof(WeaponHudLabel));
+            RectTransform rect = textObject.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = rect.anchorMin;
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -100f);
+            rect.sizeDelta = new Vector2(700f, 60f);
+            Text text = textObject.GetComponent<Text>();
+            text.text = "WEAPON: --";
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = 28;
+            text.fontStyle = FontStyle.Bold;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = new Color(0.3f, 1f, 1f);
+            text.raycastTarget = false;
+            textObject.GetComponent<WeaponHudLabel>().Configure(text, weaponManager);
         }
 
         private static void CreateStick(
