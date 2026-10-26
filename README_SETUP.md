@@ -84,6 +84,6 @@ These decisions resolve details that are contradictory or not fully determined i
 - Unity license: Unity Personal activated successfully.
 - Local Unity editor: Unity 2022.3.62f3 is installed at `C:\Program Files\Unity 2022.3.62f3`.
 - Local Unity import/compile: verified successfully with Unity 2022.3.62f3 on October 26, 2026; package resolution and script compilation exited cleanly with no C# errors or warnings.
-- EditMode tests: 23 passed, 0 failed, 0 skipped on October 26, 2026.
+- EditMode tests: 29 passed, 0 failed, 0 skipped on October 26, 2026. Coverage includes save recovery, permanent economy and shop transactions, shared health, bounded projectile pooling, weapon ownership/equip behavior, and pooled Dual Pistols launch behavior.
 - Phase 5 test scene: generated at `Assets/Scenes/Phase5_PlayerTest.unity`.
-- Runtime behavior: the Phase 5 player vertical slice still requires the manual play checks in the Unity Editor; later game phases are not implemented.
+- Runtime behavior: the Phase 5 player vertical slice still requires the manual play checks in the Unity Editor. Phase 6 standard projectile pooling and Dual Pistols firing pass automated integration checks; special weapon mechanics and later phases are not implemented.
