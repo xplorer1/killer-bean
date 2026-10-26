@@ -25,6 +25,8 @@ namespace BeanBlaster.Editor
         private const string PistolAssetPath = ResourceDirectory + "/DualPistols.asset";
         private const string DatabaseAssetPath = ResourceDirectory + "/WeaponDatabase.asset";
         private const string ProjectilePrefabPath = PrefabDirectory + "/StandardProjectile.prefab";
+        private const string GroundFirePrefabPath = PrefabDirectory + "/GroundFireZone.prefab";
+        private const string ExplosionPrefabPath = PrefabDirectory + "/ExplosionEffect.prefab";
 
         /// <summary>Creates or replaces the Phase 5 movement and respawn verification scene.</summary>
         [MenuItem("Tools/Game Setup/Development/Create Phase 5 Test Scene")]
@@ -195,53 +197,23 @@ namespace BeanBlaster.Editor
             Directory.CreateDirectory(PrefabDirectory);
             AssetDatabase.Refresh();
 
-            GameObject projectilePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ProjectilePrefabPath);
-            if (projectilePrefab == null)
-            {
-                GameObject projectileObject = new GameObject("StandardProjectile");
-                projectileObject.layer = 9;
-                Rigidbody2D body = projectileObject.AddComponent<Rigidbody2D>();
-                body.gravityScale = 0f;
-                body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-                CircleCollider2D collider = projectileObject.AddComponent<CircleCollider2D>();
-                collider.radius = 0.12f;
-                collider.isTrigger = true;
-                SpriteRenderer renderer = projectileObject.AddComponent<SpriteRenderer>();
-                renderer.sprite = sprite;
-                renderer.color = new Color(1f, 0.9f, 0.2f);
-                renderer.drawMode = SpriteDrawMode.Sliced;
-                renderer.size = new Vector2(0.32f, 0.14f);
-                renderer.sortingOrder = 2;
-                projectileObject.AddComponent<Projectile>();
-                projectilePrefab = PrefabUtility.SaveAsPrefabAsset(projectileObject, ProjectilePrefabPath);
-                Object.DestroyImmediate(projectileObject);
-            }
+            GroundFireZone fireZone = CreateGroundFirePrefab(sprite);
+            ExplosionEffect explosion = CreateExplosionPrefab(sprite);
+            GameObject pistolProjectile = CreateProjectilePrefab(ProjectilePrefabPath, "StandardProjectile", sprite, new Color(1f, 0.9f, 0.2f), true, false, null, null);
+            GameObject magnumProjectile = CreateProjectilePrefab(PrefabDirectory + "/MagnumProjectile.prefab", "MagnumProjectile", sprite, new Color(1f, 0.55f, 0.15f), true, false, null, null);
+            GameObject grenadeProjectile = CreateProjectilePrefab(PrefabDirectory + "/GrenadeProjectile.prefab", "GrenadeProjectile", sprite, new Color(0.25f, 0.9f, 0.3f), true, false, explosion, null);
+            GameObject laserProjectile = CreateProjectilePrefab(PrefabDirectory + "/LaserProjectile.prefab", "LaserProjectile", sprite, Color.cyan, false, true, null, null);
+            GameObject napalmProjectile = CreateProjectilePrefab(PrefabDirectory + "/NapalmProjectile.prefab", "NapalmProjectile", sprite, new Color(1f, 0.25f, 0.05f), true, false, null, fireZone);
 
-            WeaponData pistol = AssetDatabase.LoadAssetAtPath<WeaponData>(PistolAssetPath);
-            if (pistol == null)
-            {
-                pistol = ScriptableObject.CreateInstance<WeaponData>();
-                AssetDatabase.CreateAsset(pistol, PistolAssetPath);
-            }
+            WeaponData pistol = CreateWeaponAsset(PistolAssetPath, "pistol_dual", "Dual Pistols", 1, 0, 0.2f, 15f, 22f, 0f, 2f, 2f, AmmoType.Standard, pistolProjectile, new Color(1f, 0.9f, 0.2f), false, 0, 0, 0, 0, 0);
+            WeaponData magnum = CreateWeaponAsset(ResourceDirectory + "/HeavyMagnum.asset", "magnum", "Heavy Magnum", 2, 2500, 0.45f, 50f, 30f, 0f, 2f, 10f, AmmoType.Piercing, magnumProjectile, new Color(1f, 0.55f, 0.15f), true, 30, 90, 30, 150, 2);
+            WeaponData grenade = CreateWeaponAsset(ResourceDirectory + "/GrenadeLauncher.asset", "explosive_gl", "Grenade Launcher", 3, 7500, 0.8f, 120f, 14f, 1.5f, 3f, 9f, AmmoType.Explosive, grenadeProjectile, new Color(0.25f, 0.9f, 0.3f), true, 10, 30, 10, 400, 0);
+            WeaponData laser = CreateWeaponAsset(ResourceDirectory + "/LaserSplitter.asset", "beam_splitter", "Laser Splitter", 4, 15000, 0.35f, 40f, 40f, 0f, 1.5f, 3f, AmmoType.Beam, laserProjectile, Color.cyan, true, 50, 150, 50, 500, 0);
+            WeaponData napalm = CreateWeaponAsset(ResourceDirectory + "/NapalmBomb.asset", "fire_bomb", "Napalm Bomb", 5, 20000, 1f, 250f, 6f, 2f, 4f, 4f, AmmoType.Incendiary, napalmProjectile, new Color(1f, 0.25f, 0.05f), true, 5, 15, 5, 800, 0);
 
-            SerializedObject pistolSerialized = new SerializedObject(pistol);
-            pistolSerialized.FindProperty("id").stringValue = "pistol_dual";
-            pistolSerialized.FindProperty("displayName").stringValue = "Dual Pistols";
-            pistolSerialized.FindProperty("shopSlot").intValue = 1;
-            pistolSerialized.FindProperty("cost").intValue = 0;
-            pistolSerialized.FindProperty("fireRate").floatValue = 0.2f;
-            pistolSerialized.FindProperty("damage").floatValue = 15f;
-            pistolSerialized.FindProperty("projectileSpeed").floatValue = 22f;
-            pistolSerialized.FindProperty("projectileGravityScale").floatValue = 0f;
-            pistolSerialized.FindProperty("projectileLifetime").floatValue = 2f;
-            pistolSerialized.FindProperty("knockbackForce").floatValue = 2f;
-            pistolSerialized.FindProperty("ammoType").enumValueIndex = (int)AmmoType.Standard;
-            pistolSerialized.FindProperty("projectilePrefab").objectReferenceValue = projectilePrefab;
-            pistolSerialized.FindProperty("projectileColor").colorValue = new Color(1f, 0.9f, 0.2f);
-            pistolSerialized.FindProperty("usesAmmo").boolValue = false;
-            pistolSerialized.FindProperty("ammoPerShot").intValue = 0;
-            pistolSerialized.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(pistol);
+            SetWeaponSpecials(grenade, 3.5f, 0.4f, 0, 0f, 0f, 0f);
+            SetWeaponSpecials(laser, 0f, 0f, 3, 25f, 20f, 0.75f);
+            SetWeaponFireZone(napalm, 1.5f, 4f, 4f, 1f, 0.25f, 12f);
 
             WeaponDatabase database = AssetDatabase.LoadAssetAtPath<WeaponDatabase>(DatabaseAssetPath);
             if (database == null)
@@ -252,8 +224,12 @@ namespace BeanBlaster.Editor
 
             SerializedObject databaseSerialized = new SerializedObject(database);
             SerializedProperty weapons = databaseSerialized.FindProperty("weapons");
-            weapons.arraySize = 1;
-            weapons.GetArrayElementAtIndex(0).objectReferenceValue = pistol;
+            WeaponData[] roster = { pistol, magnum, grenade, laser, napalm };
+            weapons.arraySize = roster.Length;
+            for (int i = 0; i < roster.Length; i++)
+            {
+                weapons.GetArrayElementAtIndex(i).objectReferenceValue = roster[i];
+            }
             databaseSerialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(database);
             AssetDatabase.SaveAssets();
@@ -262,6 +238,122 @@ namespace BeanBlaster.Editor
             {
                 database = database
             };
+        }
+
+        private static GameObject CreateProjectilePrefab(string path, string name, Sprite sprite, Color color, bool trigger, bool trail, ExplosionEffect explosion, GroundFireZone fireZone)
+        {
+            GameObject projectileObject = new GameObject(name);
+            projectileObject.layer = 9;
+            Rigidbody2D body = projectileObject.AddComponent<Rigidbody2D>();
+            body.gravityScale = 0f;
+            body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+            CircleCollider2D collider = projectileObject.AddComponent<CircleCollider2D>();
+            collider.radius = 0.12f;
+            collider.isTrigger = trigger;
+            SpriteRenderer renderer = projectileObject.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.color = color;
+            renderer.drawMode = SpriteDrawMode.Sliced;
+            renderer.size = trail ? new Vector2(0.2f, 0.08f) : new Vector2(0.32f, 0.14f);
+            renderer.sortingOrder = 2;
+            if (trail)
+            {
+                projectileObject.AddComponent<TrailRenderer>();
+            }
+
+            Projectile projectile = projectileObject.AddComponent<Projectile>();
+            SetObjectReference(projectile, "explosionEffectPrefab", explosion);
+            SetObjectReference(projectile, "groundFireZonePrefab", fireZone);
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(projectileObject, path);
+            Object.DestroyImmediate(projectileObject);
+            return prefab;
+        }
+
+        private static GroundFireZone CreateGroundFirePrefab(Sprite sprite)
+        {
+            GameObject fireObject = new GameObject("GroundFireZone");
+            SpriteRenderer renderer = fireObject.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.color = new Color(1f, 0.3f, 0.05f, 0.7f);
+            renderer.sortingOrder = 1;
+            GroundFireZone zone = fireObject.AddComponent<GroundFireZone>();
+            SetObjectReference(zone, "visual", renderer);
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(fireObject, GroundFirePrefabPath);
+            Object.DestroyImmediate(fireObject);
+            return prefab.GetComponent<GroundFireZone>();
+        }
+
+        private static ExplosionEffect CreateExplosionPrefab(Sprite sprite)
+        {
+            GameObject effectObject = new GameObject("ExplosionEffect");
+            SpriteRenderer renderer = effectObject.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.color = new Color(1f, 0.55f, 0.1f, 0.8f);
+            renderer.sortingOrder = 5;
+            ExplosionEffect effect = effectObject.AddComponent<ExplosionEffect>();
+            SetObjectReference(effect, "spriteRenderer", renderer);
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(effectObject, ExplosionPrefabPath);
+            Object.DestroyImmediate(effectObject);
+            return prefab.GetComponent<ExplosionEffect>();
+        }
+
+        private static WeaponData CreateWeaponAsset(string path, string id, string displayName, int slot, int cost, float fireRate, float damage, float speed, float gravity, float lifetime, float knockback, AmmoType ammoType, GameObject projectile, Color color, bool usesAmmo, int startingAmmo, int maxAmmo, int packSize, int packCost, int pierceCount)
+        {
+            WeaponData weapon = AssetDatabase.LoadAssetAtPath<WeaponData>(path);
+            if (weapon == null)
+            {
+                weapon = ScriptableObject.CreateInstance<WeaponData>();
+                AssetDatabase.CreateAsset(weapon, path);
+            }
+
+            SerializedObject serialized = new SerializedObject(weapon);
+            serialized.FindProperty("id").stringValue = id;
+            serialized.FindProperty("displayName").stringValue = displayName;
+            serialized.FindProperty("shopSlot").intValue = slot;
+            serialized.FindProperty("cost").intValue = cost;
+            serialized.FindProperty("fireRate").floatValue = fireRate;
+            serialized.FindProperty("damage").floatValue = damage;
+            serialized.FindProperty("projectileSpeed").floatValue = speed;
+            serialized.FindProperty("projectileGravityScale").floatValue = gravity;
+            serialized.FindProperty("projectileLifetime").floatValue = lifetime;
+            serialized.FindProperty("knockbackForce").floatValue = knockback;
+            serialized.FindProperty("ammoType").enumValueIndex = (int)ammoType;
+            serialized.FindProperty("projectilePrefab").objectReferenceValue = projectile;
+            serialized.FindProperty("projectileColor").colorValue = color;
+            serialized.FindProperty("usesAmmo").boolValue = usesAmmo;
+            serialized.FindProperty("ammoPerShot").intValue = usesAmmo ? 1 : 0;
+            serialized.FindProperty("startingAmmo").intValue = startingAmmo;
+            serialized.FindProperty("maxAmmo").intValue = maxAmmo;
+            serialized.FindProperty("ammoPackSize").intValue = packSize;
+            serialized.FindProperty("ammoPackCost").intValue = packCost;
+            serialized.FindProperty("pierceCount").intValue = pierceCount;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(weapon);
+            return weapon;
+        }
+
+        private static void SetWeaponSpecials(WeaponData weapon, float radius, float edgeMultiplier, int splitCount, float splitAngle, float subDamage, float subLifetime)
+        {
+            SerializedObject serialized = new SerializedObject(weapon);
+            serialized.FindProperty("aoeRadius").floatValue = radius;
+            serialized.FindProperty("aoeEdgeDamageMultiplier").floatValue = edgeMultiplier;
+            serialized.FindProperty("splitCount").intValue = splitCount;
+            serialized.FindProperty("splitAngle").floatValue = splitAngle;
+            serialized.FindProperty("subBeamDamage").floatValue = subDamage;
+            serialized.FindProperty("subBeamLifetime").floatValue = subLifetime;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void SetWeaponFireZone(WeaponData weapon, float radius, float duration, float width, float height, float interval, float damage)
+        {
+            SerializedObject serialized = new SerializedObject(weapon);
+            serialized.FindProperty("aoeRadius").floatValue = radius;
+            serialized.FindProperty("fireZoneDuration").floatValue = duration;
+            serialized.FindProperty("fireZoneWidth").floatValue = width;
+            serialized.FindProperty("fireZoneHeight").floatValue = height;
+            serialized.FindProperty("fireZoneTickInterval").floatValue = interval;
+            serialized.FindProperty("fireZoneTickDamage").floatValue = damage;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void CreatePlayerWeaponManager(
@@ -277,6 +369,8 @@ namespace BeanBlaster.Editor
             SetObjectReference(weaponManager, "player", player.controller);
             SetObjectReference(weaponManager, "projectilePool", projectilePool);
             SetObjectReference(weaponManager, "ownerCollider", player.ownerCollider);
+            SetBoolean(weaponManager, "developmentAllWeaponsUnlocked", true);
+            SetBoolean(weaponManager, "developmentUnlimitedAmmo", true);
         }
 
         private static void CreateCombatTarget(Sprite sprite, string name, Vector2 position)
@@ -324,7 +418,7 @@ namespace BeanBlaster.Editor
             rect.anchoredPosition = new Vector2(0f, -35f);
             rect.sizeDelta = new Vector2(760f, 70f);
             Text text = textObject.GetComponent<Text>();
-            text.text = "DRAG ORANGE STICK TO AIM + FIRE";
+            text.text = "AIM + FIRE · PREV/NEXT CYCLES ALL 5 WEAPONS";
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.fontSize = 30;
             text.alignment = TextAnchor.MiddleCenter;

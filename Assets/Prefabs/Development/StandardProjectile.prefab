@@ -168,6 +168,12 @@ MonoBehaviour:
   enemyLayerMask:
     serializedVersion: 2
     m_Bits: 256
+  groundLayerMask:
+    serializedVersion: 2
+    m_Bits: 64
   explosionEffectPrefab: {fileID: 0}
+  groundFireZonePrefab: {fileID: 0}
   grenadeShakeAmplitude: 0.25
   grenadeShakeDuration: 0.2
+  beamTrailTime: 0.08
+  beamTrailWidth: 0.08
