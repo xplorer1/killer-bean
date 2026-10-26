@@ -15,7 +15,9 @@ namespace BeanBlaster.Combat
             float edgeDamageMultiplier,
             float centreKnockback,
             Team sourceTeam,
-            LayerMask targetMask)
+            LayerMask targetMask,
+            DamageType damageType = DamageType.Explosion,
+            bool guaranteedStun = true)
         {
             if (radius <= 0f || centreDamage <= 0f)
             {
@@ -55,8 +57,8 @@ namespace BeanBlaster.Combat
                     direction.normalized,
                     centreKnockback * strength,
                     sourceTeam,
-                    DamageType.Explosion,
-                    true));
+                    damageType,
+                    guaranteedStun));
                 if (applied)
                 {
                     damagedCount++;

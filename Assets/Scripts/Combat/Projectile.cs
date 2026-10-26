@@ -17,6 +17,7 @@ namespace BeanBlaster.Combat
         [SerializeField] private LayerMask enemyLayerMask = 1 << 8;
         [SerializeField] private LayerMask groundLayerMask = 1 << 6;
         [SerializeField] private ExplosionEffect explosionEffectPrefab;
+        [SerializeField] private GroundFireZone groundFireZonePrefab;
         [SerializeField, Min(0f)] private float grenadeShakeAmplitude = 0.25f;
         [SerializeField, Min(0f)] private float grenadeShakeDuration = 0.2f;
         [SerializeField, Min(0f)] private float beamTrailTime = 0.08f;
@@ -41,6 +42,7 @@ namespace BeanBlaster.Combat
 
         public event Action<Vector2, float> Exploded;
         public event Action<Vector2, Vector2> BeamSplit;
+        public event Action<Vector2, bool> NapalmResolved;
 
         private void Awake()
         {
@@ -97,6 +99,15 @@ namespace BeanBlaster.Combat
                 return;
             }
 
+            if (weapon != null && weapon.AmmoType == AmmoType.Incendiary)
+            {
+                Vector2 impactPoint = collision.contactCount > 0
+                    ? collision.GetContact(0).point
+                    : collision.collider.ClosestPoint(transform.position);
+                ProcessNapalmCollision(collision.collider, impactPoint);
+                return;
+            }
+
             ProcessCollision(collision.collider);
         }
 
@@ -117,7 +128,8 @@ namespace BeanBlaster.Combat
                 (data.AmmoType != AmmoType.Standard &&
                  data.AmmoType != AmmoType.Piercing &&
                  data.AmmoType != AmmoType.Explosive &&
-                 data.AmmoType != AmmoType.Beam) ||
+                 data.AmmoType != AmmoType.Beam &&
+                 data.AmmoType != AmmoType.Incendiary) ||
                 direction.sqrMagnitude <= Mathf.Epsilon)
             {
                 return false;
@@ -242,12 +254,79 @@ namespace BeanBlaster.Combat
                 return;
             }
 
+            if (weapon.AmmoType == AmmoType.Incendiary)
+            {
+                ProcessNapalmCollision(other, other.ClosestPoint(transform.position));
+                return;
+            }
+
             if (target != null)
             {
                 TryDamage(target);
             }
 
             ReturnToPool();
+        }
+
+        /// <summary>Applies the Napalm impact burst and places fire only on valid Ground.</summary>
+        public void ProcessNapalmCollision(Collider2D other, Vector2 impactPoint)
+        {
+            if (!launched || weapon == null || weapon.AmmoType != AmmoType.Incendiary || other == null || other == ownerCollider)
+            {
+                return;
+            }
+
+            bool hitGround = IsGround(other);
+            Health target = other.GetComponentInParent<Health>();
+            if (!hitGround && target == null)
+            {
+                ReturnToPool();
+                return;
+            }
+
+            ApplyNapalmBurst(impactPoint);
+            bool spawnedFire = hitGround
+                ? SpawnGroundFire(impactPoint)
+                : TrySpawnGroundFireBelow(impactPoint, 10f);
+            NapalmResolved?.Invoke(impactPoint, spawnedFire);
+            ReturnToPool();
+        }
+
+        private void ApplyNapalmBurst(Vector2 centre)
+        {
+            ExplosionUtility.Apply(
+                centre,
+                weapon.AoeRadius,
+                weapon.Damage,
+                1f,
+                weapon.KnockbackForce,
+                sourceTeam,
+                enemyLayerMask,
+                DamageType.Fire,
+                false);
+        }
+
+        private bool TrySpawnGroundFireBelow(Vector2 origin, float maximumDistance)
+        {
+            RaycastHit2D hit = Physics2D.Raycast(origin, Vector2.down, maximumDistance, groundLayerMask);
+            return hit.collider != null && SpawnGroundFire(hit.point);
+        }
+
+        private bool SpawnGroundFire(Vector2 groundPoint)
+        {
+            if (groundFireZonePrefab == null)
+            {
+                return false;
+            }
+
+            GroundFireZone zone = Instantiate(groundFireZonePrefab, groundPoint, Quaternion.identity);
+            zone.Play(groundPoint, sourceTeam);
+            return true;
+        }
+
+        private bool IsGround(Collider2D other)
+        {
+            return (groundLayerMask.value & (1 << other.gameObject.layer)) != 0;
         }
 
         /// <summary>Resolves beam damage or a single Ground reflection split using the collision normal.</summary>
@@ -370,6 +449,14 @@ namespace BeanBlaster.Combat
             if (weapon.AmmoType == AmmoType.Explosive)
             {
                 Detonate();
+            }
+            else if (weapon.AmmoType == AmmoType.Incendiary)
+            {
+                Vector2 centre = transform.position;
+                ApplyNapalmBurst(centre);
+                bool spawnedFire = TrySpawnGroundFireBelow(centre, 1f);
+                NapalmResolved?.Invoke(centre, spawnedFire);
+                ReturnToPool();
             }
             else
             {

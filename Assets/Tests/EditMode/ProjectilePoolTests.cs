@@ -319,6 +319,89 @@ namespace BeanBlaster.Tests.EditMode
             Object.DestroyImmediate(laser);
         }
 
+        [Test]
+        public void NapalmGroundImpact_AppliesOneBurstAndSpawnsFireZone()
+        {
+            WeaponData napalm = CreateNapalm();
+            GroundFireZone firePrefab = CreateFireZonePrefab();
+            SetProjectileField(prefab, "groundFireZonePrefab", firePrefab);
+            GameObject ground = new GameObject("Ground");
+            ground.layer = 6;
+            BoxCollider2D groundCollider = ground.AddComponent<BoxCollider2D>();
+            GameObject enemy = CreateEnemy("Burst Target");
+            SetHealthField(enemy.GetComponent<Health>(), "maxHealth", 500f);
+            enemy.GetComponent<Health>().ResetHealth();
+            enemy.transform.position = new Vector2(0f, 0.5f);
+            Physics2D.SyncTransforms();
+            bool fireSpawned = false;
+            prefab.NapalmResolved += (_, spawned) => fireSpawned = spawned;
+            Assert.That(prefab.Launch(napalm, Vector2.right, Team.Player, null), Is.True);
+
+            prefab.ProcessNapalmCollision(groundCollider, Vector2.zero);
+
+            Assert.That(enemy.GetComponent<Health>().CurrentHealth, Is.EqualTo(250f));
+            Assert.That(fireSpawned, Is.True);
+            Assert.That(prefab.IsLaunched, Is.False);
+            DestroyFireZones(firePrefab);
+            Object.DestroyImmediate(firePrefab.gameObject);
+            Object.DestroyImmediate(ground);
+            Object.DestroyImmediate(enemy);
+            Object.DestroyImmediate(napalm);
+        }
+
+        [Test]
+        public void NapalmEnemyImpact_RaycastsDownUpToTenMetresForGround()
+        {
+            WeaponData napalm = CreateNapalm();
+            GroundFireZone firePrefab = CreateFireZonePrefab();
+            SetProjectileField(prefab, "groundFireZonePrefab", firePrefab);
+            GameObject enemy = CreateEnemy("Impact Target");
+            enemy.transform.position = new Vector2(0f, 5f);
+            GameObject ground = new GameObject("Ground");
+            ground.layer = 6;
+            ground.transform.position = Vector2.zero;
+            ground.AddComponent<BoxCollider2D>().size = new Vector2(4f, 1f);
+            Physics2D.SyncTransforms();
+            bool fireSpawned = false;
+            prefab.NapalmResolved += (_, spawned) => fireSpawned = spawned;
+            Assert.That(prefab.Launch(napalm, Vector2.right, Team.Player, null), Is.True);
+
+            prefab.ProcessNapalmCollision(enemy.GetComponent<Collider2D>(), enemy.transform.position);
+
+            Assert.That(fireSpawned, Is.True);
+            DestroyFireZones(firePrefab);
+            Object.DestroyImmediate(firePrefab.gameObject);
+            Object.DestroyImmediate(enemy);
+            Object.DestroyImmediate(ground);
+            Object.DestroyImmediate(napalm);
+        }
+
+        [Test]
+        public void NapalmLifetimeExpiry_RequiresGroundWithinOneMetre()
+        {
+            WeaponData napalm = CreateNapalm();
+            GroundFireZone firePrefab = CreateFireZonePrefab();
+            SetProjectileField(prefab, "groundFireZonePrefab", firePrefab);
+            GameObject ground = new GameObject("Ground");
+            ground.layer = 6;
+            ground.transform.position = new Vector2(0f, -2f);
+            ground.AddComponent<BoxCollider2D>().size = new Vector2(4f, 1f);
+            prefab.transform.position = Vector2.zero;
+            Physics2D.SyncTransforms();
+            bool fireSpawned = true;
+            prefab.NapalmResolved += (_, spawned) => fireSpawned = spawned;
+            Assert.That(prefab.Launch(napalm, Vector2.right, Team.Player, null), Is.True);
+
+            InvokeLifetimeExpiry(prefab);
+
+            Assert.That(fireSpawned, Is.False);
+            Assert.That(prefab.IsLaunched, Is.False);
+            DestroyFireZones(firePrefab);
+            Object.DestroyImmediate(firePrefab.gameObject);
+            Object.DestroyImmediate(ground);
+            Object.DestroyImmediate(napalm);
+        }
+
         private static WeaponData CreateMagnum()
         {
             WeaponData weapon = ScriptableObject.CreateInstance<WeaponData>();
@@ -363,6 +446,37 @@ namespace BeanBlaster.Tests.EditMode
             return weapon;
         }
 
+        private static WeaponData CreateNapalm()
+        {
+            WeaponData weapon = ScriptableObject.CreateInstance<WeaponData>();
+            SetWeaponField(weapon, "id", "fire_bomb");
+            SetWeaponField(weapon, "ammoType", AmmoType.Incendiary);
+            SetWeaponField(weapon, "damage", 250f);
+            SetWeaponField(weapon, "projectileSpeed", 6f);
+            SetWeaponField(weapon, "projectileGravityScale", 2f);
+            SetWeaponField(weapon, "projectileLifetime", 4f);
+            SetWeaponField(weapon, "knockbackForce", 4f);
+            SetWeaponField(weapon, "aoeRadius", 1.5f);
+            return weapon;
+        }
+
+        private static GroundFireZone CreateFireZonePrefab()
+        {
+            GameObject prefabObject = new GameObject("Ground Fire Zone Prefab");
+            return prefabObject.AddComponent<GroundFireZone>();
+        }
+
+        private static void DestroyFireZones(GroundFireZone prefabZone)
+        {
+            foreach (GroundFireZone zone in Object.FindObjectsOfType<GroundFireZone>())
+            {
+                if (zone != prefabZone)
+                {
+                    Object.DestroyImmediate(zone.gameObject);
+                }
+            }
+        }
+
         private static void InvokeLifetimeExpiry(Projectile projectile)
         {
             MethodInfo method = typeof(Projectile).GetMethod(
@@ -394,6 +508,13 @@ namespace BeanBlaster.Tests.EditMode
             FieldInfo field = typeof(Health).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(field, Is.Not.Null);
             field.SetValue(health, value);
+        }
+
+        private static void SetProjectileField(Projectile projectile, string name, object value)
+        {
+            FieldInfo field = typeof(Projectile).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            field.SetValue(projectile, value);
         }
 
         private void SetField(string name, object value)
