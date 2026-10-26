@@ -26,13 +26,28 @@ These steps cannot be assumed from source generation alone:
 
 ## Android editor modules
 
-The current Unity 2022.3.62f3 installation does **not** include Android Build Support. Before the first device build, add these modules to that exact editor version through Unity Hub:
+The Unity 2022.3.62f3 installation includes the Android toolchain required by this project:
 
 - Android Build Support
 - Android SDK & NDK Tools
 - OpenJDK
 
-Do not install another Unity editor version just to obtain these modules. The connected Samsung device and the local Android emulator are already visible through `adb`; the missing Unity module is the present build blocker.
+The modules live under `Editor/Data/PlaybackEngines/AndroidPlayer`. Do not install another Unity editor version for Android work on this project.
+
+## Android development build
+
+Use **Tools → Game Setup → Android → Build Development APK**, or run this command from PowerShell with the Unity Editor closed:
+
+```powershell
+& 'C:\Program Files\Unity 2022.3.62f3\Editor\Unity.exe' -batchmode -nographics -projectPath $PWD -executeMethod BeanBlaster.Editor.AndroidBuildTools.BuildDevelopmentApk -logFile "$PWD\Logs\android-build.log" -quit
+```
+
+The APK is written to `Builds/Android/BeanBlaster-dev.apk`. Install it on a specifically selected device rather than relying on ADB's default when an emulator is also running:
+
+```powershell
+adb devices -l
+adb -s <device-serial> install -r .\Builds\Android\BeanBlaster-dev.apk
+```
 
 ## Full setup
 
@@ -102,6 +117,9 @@ These decisions resolve details that are contradictory or not fully determined i
 - Unity license: Unity Personal activated successfully.
 - Local Unity editor: Unity 2022.3.62f3 is installed at `C:\Program Files\Unity 2022.3.62f3`.
 - Local Unity import/compile: verified successfully with Unity 2022.3.62f3 on October 26, 2026; package resolution and script compilation exited cleanly with no C# errors or warnings.
-- EditMode tests: 29 passed, 0 failed, 0 skipped on October 26, 2026. Coverage includes save recovery, permanent economy and shop transactions, shared health, bounded projectile pooling, weapon ownership/equip behavior, and pooled Dual Pistols launch behavior.
-- Phase 5 test scene: generated at `Assets/Scenes/Phase5_PlayerTest.unity`.
-- Runtime behavior: the Phase 5 player vertical slice still requires the manual play checks in the Unity Editor. Phase 6 standard projectile pooling and Dual Pistols firing pass automated integration checks; special weapon mechanics and later phases are not implemented.
+- Android toolchain: Android Build Support, SDK, NDK, and OpenJDK verified under Unity 2022.3.62f3 on October 26, 2026.
+- EditMode tests: 41 passed, 0 failed, 0 skipped on October 26, 2026. Coverage includes save recovery, permanent economy, shared health, projectile pooling, weapon behavior, mobile input state, pointer ownership, and safe-area calculations.
+- Android development build: `Builds/Android/BeanBlaster-dev.apk` built successfully on October 26, 2026 for ARMv7 and ARM64 using IL2CPP. APK size: 64,906,077 bytes.
+- Phase 5 test scene: generated at `Assets/Scenes/Phase5_PlayerTest.unity` with a safe-area-aware multitouch HUD.
+- Device installation: not yet verified. ADB lost the connected devices when its server restarted immediately before installation; reconnect and authorize the phone, then repeat the serial-specific install command above.
+- Runtime behavior: the Phase 5 player vertical slice and touch-control feel still require physical-device review. Phase 6 standard projectile pooling and Dual Pistols firing pass automated integration checks; special weapon mechanics and later phases are not implemented.
