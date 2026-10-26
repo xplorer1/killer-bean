@@ -17,6 +17,7 @@ namespace BeanBlaster.Editor
         [MenuItem("Tools/Game Setup/Android/Configure Project")]
         public static void ConfigureProject()
         {
+            SetActiveInputHandlingToInputSystem();
             PlayerSettings.companyName = "Bean Blaster";
             PlayerSettings.productName = "Bean Blaster";
             PlayerSettings.bundleVersion = "0.1.0";
@@ -44,6 +45,25 @@ namespace BeanBlaster.Editor
 
             AssetDatabase.SaveAssets();
             Debug.Log("Configured Android project settings for Bean Blaster.");
+        }
+
+        private static void SetActiveInputHandlingToInputSystem()
+        {
+            UnityEngine.Object[] settingsAssets = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset");
+            if (settingsAssets.Length == 0)
+            {
+                throw new InvalidOperationException("Could not load ProjectSettings.asset.");
+            }
+
+            SerializedObject settings = new SerializedObject(settingsAssets[0]);
+            SerializedProperty activeInputHandler = settings.FindProperty("activeInputHandler");
+            if (activeInputHandler == null)
+            {
+                throw new InvalidOperationException("Unity project settings do not expose activeInputHandler.");
+            }
+
+            activeInputHandler.intValue = 1;
+            settings.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /// <summary>Configures Android and builds the enabled scenes into a development APK.</summary>
