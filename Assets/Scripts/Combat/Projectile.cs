@@ -19,6 +19,9 @@ namespace BeanBlaster.Combat
         [SerializeField] private ExplosionEffect explosionEffectPrefab;
         [SerializeField, Min(0f)] private float grenadeShakeAmplitude = 0.25f;
         [SerializeField, Min(0f)] private float grenadeShakeDuration = 0.2f;
+        [SerializeField, Min(0f)] private float beamTrailTime = 0.12f;
+        [SerializeField, Min(0f)] private float mainBeamTrailWidth = 0.1f;
+        [SerializeField, Min(0f)] private float splitBeamTrailWidth = 0.06f;
 
         private ProjectilePool pool;
         private WeaponData weapon;
@@ -146,10 +149,23 @@ namespace BeanBlaster.Combat
             if (trailRenderer != null)
             {
                 trailRenderer.Clear();
+                if (data.AmmoType == AmmoType.Beam)
+                {
+                    ConfigureBeamTrail(data.ProjectileColor, splitBeam);
+                }
                 trailRenderer.emitting = true;
             }
 
             return true;
+        }
+
+        private void ConfigureBeamTrail(Color color, bool splitBeam)
+        {
+            trailRenderer.time = beamTrailTime;
+            trailRenderer.startWidth = splitBeam ? splitBeamTrailWidth : mainBeamTrailWidth;
+            trailRenderer.endWidth = 0f;
+            trailRenderer.startColor = color;
+            trailRenderer.endColor = new Color(color.r, color.g, color.b, 0f);
         }
 
         /// <summary>Clears every piece of state that may leak between pooled uses.</summary>

@@ -255,6 +255,24 @@ namespace BeanBlaster.Tests.EditMode
             Object.DestroyImmediate(laser);
         }
 
+        [Test]
+        public void BeamTrail_IsConfiguredOnLaunchAndDisabledOnPoolReset()
+        {
+            TrailRenderer trail = prefabObject.AddComponent<TrailRenderer>();
+            WeaponData laser = CreateLaser();
+
+            Assert.That(prefab.Launch(laser, Vector2.right, Team.Player, null), Is.True);
+            Assert.That(trail.emitting, Is.True);
+            Assert.That(trail.time, Is.EqualTo(0.12f).Within(0.001f));
+            Assert.That(trail.startWidth, Is.EqualTo(0.1f).Within(0.001f));
+            Assert.That(trail.endWidth, Is.Zero.Within(0.001f));
+
+            prefab.ResetForReuse();
+
+            Assert.That(trail.emitting, Is.False);
+            Object.DestroyImmediate(laser);
+        }
+
         private static WeaponData CreateMagnum()
         {
             WeaponData weapon = ScriptableObject.CreateInstance<WeaponData>();
