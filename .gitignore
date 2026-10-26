@@ -1,0 +1,43 @@
+reference-private/
+*.apk
+sdk-image-install.log
+.tools/
+.gradle/
+.gradle-user/
+**/build/
+local.properties
+*.jks
+*.keystore
+.idea/
+
+.do-not-track
+
+# Unity generated state
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# IDE generated files
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.vs/
+
+# Local verification output
+/unity-*.log
+/editmode-results.xml
