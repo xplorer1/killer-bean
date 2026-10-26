@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce88a0be46b9f1d4bb4ebb75338d0700, type: 3}
+  m_Name: DualPistols
+  m_EditorClassIdentifier: 
+  id: pistol_dual
+  displayName: Dual Pistols
+  description: 
+  shopSlot: 1
+  cost: 0
+  icon: {fileID: 0}
+  fireRate: 0.2
+  damage: 15
+  projectileSpeed: 22
+  projectileGravityScale: 0
+  projectileLifetime: 2
+  knockbackForce: 2
+  ammoType: 0
+  projectilePrefab: {fileID: 4268206734093105687, guid: 9dbd0f5447dc1c14f9f83e7d31c9afd3, type: 3}
+  projectileColor: {r: 1, g: 0.9, b: 0.2, a: 1}
+  usesAmmo: 0
+  ammoPerShot: 0
+  startingAmmo: 0
+  maxAmmo: 0
+  ammoPackSize: 0
+  ammoPackCost: 0
+  pierceCount: 0
+  aoeRadius: 0
+  aoeEdgeDamageMultiplier: 0
+  splitCount: 0
+  splitAngle: 0
+  subBeamDamage: 0
+  subBeamLifetime: 0
+  fireZoneDuration: 0
+  fireZoneWidth: 0
+  fireZoneHeight: 0
+  fireZoneTickInterval: 0
+  fireZoneTickDamage: 0

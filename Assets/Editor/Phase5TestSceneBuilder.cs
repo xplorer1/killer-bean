@@ -1,6 +1,7 @@
 using System.IO;
 using BeanBlaster.Combat;
 using BeanBlaster.Core;
+using BeanBlaster.Enemies;
 using BeanBlaster.Level;
 using BeanBlaster.Player;
 using BeanBlaster.UI;
@@ -19,6 +20,11 @@ namespace BeanBlaster.Editor
     {
         private const string SceneDirectory = "Assets/Scenes";
         private const string ScenePath = SceneDirectory + "/Phase5_PlayerTest.unity";
+        private const string ResourceDirectory = "Assets/Resources";
+        private const string PrefabDirectory = "Assets/Prefabs/Development";
+        private const string PistolAssetPath = ResourceDirectory + "/DualPistols.asset";
+        private const string DatabaseAssetPath = ResourceDirectory + "/WeaponDatabase.asset";
+        private const string ProjectilePrefabPath = PrefabDirectory + "/StandardProjectile.prefab";
 
         /// <summary>Creates or replaces the Phase 5 movement and respawn verification scene.</summary>
         [MenuItem("Tools/Game Setup/Development/Create Phase 5 Test Scene")]
@@ -28,6 +34,7 @@ namespace BeanBlaster.Editor
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             Sprite square = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            CombatAssets combatAssets = CreateCombatAssets(square);
             CreateCamera();
             GameObject managerObject = new GameObject("LevelManager");
             LevelManager manager = managerObject.AddComponent<LevelManager>();
@@ -40,8 +47,13 @@ namespace BeanBlaster.Editor
             CreateGround(square, new Vector2(7f, 1.5f), new Vector2(3f, 0.5f));
             CreateGround(square, new Vector2(-7f, 3f), new Vector2(3f, 0.5f));
             CreateKillPlane(manager);
-            PlayerInputReader input = CreatePlayer(square, spawn.transform.position, manager);
-            CreateTouchHud(square, input);
+            ProjectilePool projectilePool = new GameObject("ProjectilePool").AddComponent<ProjectilePool>();
+            PlayerBuild player = CreatePlayer(square, spawn.transform.position, manager);
+            CreatePlayerWeaponManager(player, combatAssets, projectilePool);
+            CreateCombatTarget(square, "Target A", new Vector2(4f, 0.25f));
+            CreateCombatTarget(square, "Target B", new Vector2(6.5f, 0.25f));
+            CreateCombatTarget(square, "Target C", new Vector2(9f, 0.25f));
+            CreateTouchHud(square, player.input);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -58,6 +70,7 @@ namespace BeanBlaster.Editor
             camera.orthographicSize = 7f;
             cameraObject.transform.position = new Vector3(0f, 2f, -10f);
             cameraObject.AddComponent<AudioListener>();
+            cameraObject.AddComponent<CameraShake>();
         }
 
         private static void CreateGround(Sprite sprite, Vector2 position, Vector2 size)
@@ -83,7 +96,7 @@ namespace BeanBlaster.Editor
             killPlane.AddComponent<KillPlane>();
         }
 
-        private static PlayerInputReader CreatePlayer(Sprite sprite, Vector3 position, LevelManager manager)
+        private static PlayerBuild CreatePlayer(Sprite sprite, Vector3 position, LevelManager manager)
         {
             GameObject player = new GameObject("Player");
             player.tag = "Player";
@@ -131,7 +144,15 @@ namespace BeanBlaster.Editor
             SetObjectReference(controller, "levelManager", manager);
             SetLayerMask(controller, "groundLayerMask", 1 << 6);
             input.SetAimOrigin(pivotObject.transform);
-            return input;
+            return new PlayerBuild
+            {
+                gameObject = player,
+                input = input,
+                controller = controller,
+                ownerCollider = collider,
+                fireSocket = fireSocket.transform,
+                gunRenderer = gunRenderer
+            };
         }
 
         private static void CreateTouchHud(Sprite sprite, PlayerInputReader playerInput)
@@ -161,10 +182,154 @@ namespace BeanBlaster.Editor
             CreateButton(safeArea, sprite, mobileInput, "PREV", new Vector2(-340f, -95f), new Vector2(150f, 90f), true, TouchActionButtonRole.PreviousWeapon);
             CreateButton(safeArea, sprite, mobileInput, "NEXT", new Vector2(-170f, -95f), new Vector2(150f, 90f), true, TouchActionButtonRole.NextWeapon);
             CreateButton(safeArea, sprite, mobileInput, "II", new Vector2(-75f, -70f), new Vector2(100f, 100f), true, TouchActionButtonRole.Pause);
+            CreateInstruction(safeArea);
 
             GameObject eventSystemObject = new GameObject("EventSystem", typeof(EventSystem));
             InputSystemUIInputModule module = eventSystemObject.AddComponent<InputSystemUIInputModule>();
             module.AssignDefaultActions();
+        }
+
+        private static CombatAssets CreateCombatAssets(Sprite sprite)
+        {
+            Directory.CreateDirectory(ResourceDirectory);
+            Directory.CreateDirectory(PrefabDirectory);
+            AssetDatabase.Refresh();
+
+            GameObject projectilePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ProjectilePrefabPath);
+            if (projectilePrefab == null)
+            {
+                GameObject projectileObject = new GameObject("StandardProjectile");
+                projectileObject.layer = 9;
+                Rigidbody2D body = projectileObject.AddComponent<Rigidbody2D>();
+                body.gravityScale = 0f;
+                body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+                CircleCollider2D collider = projectileObject.AddComponent<CircleCollider2D>();
+                collider.radius = 0.12f;
+                collider.isTrigger = true;
+                SpriteRenderer renderer = projectileObject.AddComponent<SpriteRenderer>();
+                renderer.sprite = sprite;
+                renderer.color = new Color(1f, 0.9f, 0.2f);
+                renderer.drawMode = SpriteDrawMode.Sliced;
+                renderer.size = new Vector2(0.32f, 0.14f);
+                renderer.sortingOrder = 2;
+                projectileObject.AddComponent<Projectile>();
+                projectilePrefab = PrefabUtility.SaveAsPrefabAsset(projectileObject, ProjectilePrefabPath);
+                Object.DestroyImmediate(projectileObject);
+            }
+
+            WeaponData pistol = AssetDatabase.LoadAssetAtPath<WeaponData>(PistolAssetPath);
+            if (pistol == null)
+            {
+                pistol = ScriptableObject.CreateInstance<WeaponData>();
+                AssetDatabase.CreateAsset(pistol, PistolAssetPath);
+            }
+
+            SerializedObject pistolSerialized = new SerializedObject(pistol);
+            pistolSerialized.FindProperty("id").stringValue = "pistol_dual";
+            pistolSerialized.FindProperty("displayName").stringValue = "Dual Pistols";
+            pistolSerialized.FindProperty("shopSlot").intValue = 1;
+            pistolSerialized.FindProperty("cost").intValue = 0;
+            pistolSerialized.FindProperty("fireRate").floatValue = 0.2f;
+            pistolSerialized.FindProperty("damage").floatValue = 15f;
+            pistolSerialized.FindProperty("projectileSpeed").floatValue = 22f;
+            pistolSerialized.FindProperty("projectileGravityScale").floatValue = 0f;
+            pistolSerialized.FindProperty("projectileLifetime").floatValue = 2f;
+            pistolSerialized.FindProperty("knockbackForce").floatValue = 2f;
+            pistolSerialized.FindProperty("ammoType").enumValueIndex = (int)AmmoType.Standard;
+            pistolSerialized.FindProperty("projectilePrefab").objectReferenceValue = projectilePrefab;
+            pistolSerialized.FindProperty("projectileColor").colorValue = new Color(1f, 0.9f, 0.2f);
+            pistolSerialized.FindProperty("usesAmmo").boolValue = false;
+            pistolSerialized.FindProperty("ammoPerShot").intValue = 0;
+            pistolSerialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(pistol);
+
+            WeaponDatabase database = AssetDatabase.LoadAssetAtPath<WeaponDatabase>(DatabaseAssetPath);
+            if (database == null)
+            {
+                database = ScriptableObject.CreateInstance<WeaponDatabase>();
+                AssetDatabase.CreateAsset(database, DatabaseAssetPath);
+            }
+
+            SerializedObject databaseSerialized = new SerializedObject(database);
+            SerializedProperty weapons = databaseSerialized.FindProperty("weapons");
+            weapons.arraySize = 1;
+            weapons.GetArrayElementAtIndex(0).objectReferenceValue = pistol;
+            databaseSerialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(database);
+            AssetDatabase.SaveAssets();
+
+            return new CombatAssets
+            {
+                database = database
+            };
+        }
+
+        private static void CreatePlayerWeaponManager(
+            PlayerBuild player,
+            CombatAssets assets,
+            ProjectilePool projectilePool)
+        {
+            WeaponManager weaponManager = player.gameObject.AddComponent<WeaponManager>();
+            SetObjectReference(weaponManager, "database", assets.database);
+            SetObjectReference(weaponManager, "input", player.input);
+            SetObjectReference(weaponManager, "fireSocket", player.fireSocket);
+            SetObjectReference(weaponManager, "gunRenderer", player.gunRenderer);
+            SetObjectReference(weaponManager, "player", player.controller);
+            SetObjectReference(weaponManager, "projectilePool", projectilePool);
+            SetObjectReference(weaponManager, "ownerCollider", player.ownerCollider);
+        }
+
+        private static void CreateCombatTarget(Sprite sprite, string name, Vector2 position)
+        {
+            GameObject target = new GameObject(name);
+            target.layer = 8;
+            target.transform.position = position;
+            BoxCollider2D collider = target.AddComponent<BoxCollider2D>();
+            collider.size = new Vector2(0.9f, 1.5f);
+            SpriteRenderer renderer = target.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.drawMode = SpriteDrawMode.Sliced;
+            renderer.size = collider.size;
+            Health health = target.AddComponent<Health>();
+            SetEnum(health, "team", (int)Team.Enemy);
+            SetFloat(health, "maxHealth", 60f);
+
+            GameObject barBackground = new GameObject("HealthBar", typeof(SpriteRenderer));
+            barBackground.transform.SetParent(target.transform, false);
+            barBackground.transform.localPosition = new Vector3(0f, 1.05f, 0f);
+            barBackground.transform.localScale = new Vector3(1.1f, 0.12f, 1f);
+            SpriteRenderer backgroundRenderer = barBackground.GetComponent<SpriteRenderer>();
+            backgroundRenderer.sprite = sprite;
+            backgroundRenderer.color = new Color(0.1f, 0.1f, 0.1f);
+            backgroundRenderer.sortingOrder = 3;
+
+            GameObject fillObject = new GameObject("Fill", typeof(SpriteRenderer));
+            fillObject.transform.SetParent(barBackground.transform, false);
+            fillObject.transform.localPosition = new Vector3(0f, 0f, -0.01f);
+            SpriteRenderer fillRenderer = fillObject.GetComponent<SpriteRenderer>();
+            fillRenderer.sprite = sprite;
+            fillRenderer.color = new Color(0.2f, 1f, 0.2f);
+            fillRenderer.sortingOrder = 4;
+            target.AddComponent<CombatTargetDummy>().Configure(fillObject.transform);
+        }
+
+        private static void CreateInstruction(RectTransform parent)
+        {
+            GameObject textObject = new GameObject("Combat Instruction", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            RectTransform rect = textObject.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = rect.anchorMin;
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -35f);
+            rect.sizeDelta = new Vector2(760f, 70f);
+            Text text = textObject.GetComponent<Text>();
+            text.text = "DRAG ORANGE STICK TO AIM + FIRE";
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = 30;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = Color.white;
+            text.raycastTarget = false;
         }
 
         private static void CreateStick(
@@ -276,6 +441,21 @@ namespace BeanBlaster.Editor
             SerializedObject serialized = new SerializedObject(target);
             serialized.FindProperty(propertyName).intValue = value;
             serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private struct PlayerBuild
+        {
+            public GameObject gameObject;
+            public PlayerInputReader input;
+            public PlayerController2D controller;
+            public Collider2D ownerCollider;
+            public Transform fireSocket;
+            public SpriteRenderer gunRenderer;
+        }
+
+        private struct CombatAssets
+        {
+            public WeaponDatabase database;
         }
     }
 }
