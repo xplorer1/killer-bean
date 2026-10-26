@@ -14,6 +14,7 @@ namespace BeanBlaster.Combat
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private TrailRenderer trailRenderer;
         [SerializeField] private LayerMask enemyLayerMask = 1 << 8;
+        [SerializeField] private ExplosionEffect explosionEffectPrefab;
 
         private ProjectilePool pool;
         private WeaponData weapon;
@@ -293,6 +294,12 @@ namespace BeanBlaster.Combat
                 weapon.KnockbackForce,
                 sourceTeam,
                 enemyLayerMask);
+            if (explosionEffectPrefab != null)
+            {
+                ExplosionEffect effect = Instantiate(explosionEffectPrefab, centre, Quaternion.identity);
+                effect.Play(centre, radius);
+            }
+
             Exploded?.Invoke(centre, radius);
             ReturnToPool();
         }
