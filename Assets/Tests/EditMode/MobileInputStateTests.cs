@@ -1,5 +1,6 @@
 using BeanBlaster.Player;
 using NUnit.Framework;
+using System.Reflection;
 using UnityEngine;
 
 namespace BeanBlaster.Tests.EditMode
@@ -86,6 +87,46 @@ namespace BeanBlaster.Tests.EditMode
             input.PressPreviousWeapon();
             input.PressPause();
 
+            Assert.That(next, Is.EqualTo(1));
+            Assert.That(previous, Is.EqualTo(1));
+            Assert.That(pause, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void PlayerInputReader_ConsumesTouchMovementJumpAndFire()
+        {
+            PlayerInputReader reader = gameObject.AddComponent<PlayerInputReader>();
+            reader.SetMobileInput(input);
+            input.SetMove(new Vector2(-0.75f, 0f));
+            input.SetJumpHeld(true);
+            input.SetAim(Vector2.up, true);
+
+            Assert.That(reader.MoveX, Is.EqualTo(-0.75f));
+            Assert.That(reader.JumpHeld, Is.True);
+            Assert.That(reader.JumpPressedThisFrame, Is.True);
+            Assert.That(reader.JumpPressedThisFrame, Is.False);
+            Assert.That(reader.FireHeld, Is.True);
+        }
+
+        [Test]
+        public void PlayerInputReader_UsesTouchAimAndForwardsButtons()
+        {
+            PlayerInputReader reader = gameObject.AddComponent<PlayerInputReader>();
+            reader.SetMobileInput(input);
+            int next = 0;
+            int previous = 0;
+            int pause = 0;
+            reader.NextWeaponPressed += () => next++;
+            reader.PrevWeaponPressed += () => previous++;
+            reader.PausePressed += () => pause++;
+            input.SetAim(Vector2.up, true);
+
+            typeof(PlayerInputReader).GetMethod("UpdateAim", BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(reader, null);
+            input.PressNextWeapon();
+            input.PressPreviousWeapon();
+            input.PressPause();
+
+            Assert.That(reader.AimDirection, Is.EqualTo(Vector2.up));
             Assert.That(next, Is.EqualTo(1));
             Assert.That(previous, Is.EqualTo(1));
             Assert.That(pause, Is.EqualTo(1));

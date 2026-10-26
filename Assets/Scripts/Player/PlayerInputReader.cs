@@ -8,6 +8,7 @@ namespace BeanBlaster.Player
     public sealed class PlayerInputReader : MonoBehaviour
     {
         [SerializeField] private Transform aimOrigin;
+        [SerializeField] private MobileInputState mobileInput;
         [SerializeField, Range(0f, 1f)] private float gamepadAimDeadzone = 0.3f;
 
         private InputAction moveAction;
@@ -29,10 +30,28 @@ namespace BeanBlaster.Player
         public event Action PausePressed;
         public event Action<int> SelectWeaponPressed;
 
-        public float MoveX => moveAction?.ReadValue<float>() ?? 0f;
-        public bool JumpPressedThisFrame => jumpAction?.WasPressedThisFrame() ?? false;
-        public bool JumpHeld => jumpAction?.IsPressed() ?? false;
-        public bool FireHeld => fireAction?.IsPressed() ?? false;
+        public float MoveX
+        {
+            get
+            {
+                float deviceMove = moveAction?.ReadValue<float>() ?? 0f;
+                float touchMove = mobileInput == null ? 0f : mobileInput.Move.x;
+                return Mathf.Abs(touchMove) > Mathf.Abs(deviceMove) ? touchMove : deviceMove;
+            }
+        }
+
+        public bool JumpPressedThisFrame
+        {
+            get
+            {
+                bool touchPressed = mobileInput != null && mobileInput.ConsumeJumpPress();
+                return touchPressed || (jumpAction?.WasPressedThisFrame() ?? false);
+            }
+        }
+
+        public bool JumpHeld => (jumpAction?.IsPressed() ?? false) || (mobileInput != null && mobileInput.JumpHeld);
+        public bool FireHeld => (fireAction?.IsPressed() ?? false) ||
+                                (mobileInput != null && (mobileInput.FireHeld || mobileInput.AimEngaged));
         public Vector2 AimDirection => aimDirection;
         public bool UsingGamepadAim => usingGamepadAim;
 
@@ -45,6 +64,7 @@ namespace BeanBlaster.Player
         {
             CreateActions();
             SetActionsEnabled(true);
+            SubscribeToMobileInput();
         }
 
         private void OnDisable()
@@ -53,6 +73,8 @@ namespace BeanBlaster.Player
             {
                 SetActionsEnabled(false);
             }
+
+            UnsubscribeFromMobileInput();
         }
 
         private void OnDestroy()
@@ -98,6 +120,22 @@ namespace BeanBlaster.Player
         public void SetAimOrigin(Transform origin)
         {
             aimOrigin = origin;
+        }
+
+        /// <summary>Connects the touch HUD input state used by mobile builds.</summary>
+        public void SetMobileInput(MobileInputState value)
+        {
+            if (mobileInput == value)
+            {
+                return;
+            }
+
+            UnsubscribeFromMobileInput();
+            mobileInput = value;
+            if (isActiveAndEnabled)
+            {
+                SubscribeToMobileInput();
+            }
         }
 
         private void CreateActions()
@@ -176,6 +214,16 @@ namespace BeanBlaster.Player
 
         private void UpdateAim()
         {
+            if (mobileInput != null && mobileInput.HasAimDirection)
+            {
+                aimDirection = mobileInput.AimDirection;
+                usingGamepadAim = false;
+                if (mobileInput.AimEngaged || Application.isMobilePlatform)
+                {
+                    return;
+                }
+            }
+
             Vector2 stick = aimStickAction.ReadValue<Vector2>();
             if (stick.magnitude > gamepadAimDeadzone)
             {
@@ -221,6 +269,48 @@ namespace BeanBlaster.Player
         }
 
         private void OnPause(InputAction.CallbackContext context)
+        {
+            PausePressed?.Invoke();
+        }
+
+        private void SubscribeToMobileInput()
+        {
+            if (mobileInput == null)
+            {
+                return;
+            }
+
+            mobileInput.NextWeaponPressed -= OnMobileNextWeapon;
+            mobileInput.PrevWeaponPressed -= OnMobilePreviousWeapon;
+            mobileInput.PausePressed -= OnMobilePause;
+            mobileInput.NextWeaponPressed += OnMobileNextWeapon;
+            mobileInput.PrevWeaponPressed += OnMobilePreviousWeapon;
+            mobileInput.PausePressed += OnMobilePause;
+        }
+
+        private void UnsubscribeFromMobileInput()
+        {
+            if (mobileInput == null)
+            {
+                return;
+            }
+
+            mobileInput.NextWeaponPressed -= OnMobileNextWeapon;
+            mobileInput.PrevWeaponPressed -= OnMobilePreviousWeapon;
+            mobileInput.PausePressed -= OnMobilePause;
+        }
+
+        private void OnMobileNextWeapon()
+        {
+            NextWeaponPressed?.Invoke();
+        }
+
+        private void OnMobilePreviousWeapon()
+        {
+            PrevWeaponPressed?.Invoke();
+        }
+
+        private void OnMobilePause()
         {
             PausePressed?.Invoke();
         }
