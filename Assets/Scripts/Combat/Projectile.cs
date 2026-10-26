@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using BeanBlaster.Core;
 using UnityEngine;
 
@@ -16,11 +17,15 @@ namespace BeanBlaster.Combat
         private WeaponData weapon;
         private Team sourceTeam;
         private Collider2D ownerCollider;
+        private readonly HashSet<Health> hitTargets = new HashSet<Health>();
+        private readonly HashSet<Collider2D> ignoredTargetColliders = new HashSet<Collider2D>();
+        private Vector2 launchDirection;
         private float remainingLifetime;
         private bool launched;
 
         public int PrefabKey { get; private set; }
         public bool IsLaunched => launched;
+        public int UniqueTargetsHit => hitTargets.Count;
 
         private void Awake()
         {
@@ -68,30 +73,20 @@ namespace BeanBlaster.Combat
 
         private void OnCollisionEnter2D(Collision2D collision)
         {
-            if (!launched || weapon == null)
-            {
-                return;
-            }
+            ProcessCollision(collision.collider);
+        }
 
-            Health target = collision.collider.GetComponentInParent<Health>();
-            if (target != null)
-            {
-                target.TryApplyDamage(new DamageInfo(
-                    weapon.Damage,
-                    transform.position,
-                    body.velocity.sqrMagnitude > 0f ? body.velocity.normalized : (Vector2)transform.right,
-                    weapon.KnockbackForce,
-                    sourceTeam,
-                    DamageType.Bullet));
-            }
-
-            ReturnToPool();
+        private void OnTriggerEnter2D(Collider2D other)
+        {
+            ProcessCollision(other);
         }
 
         /// <summary>Initializes velocity, damage data, lifetime, appearance, and owner collision for one shot.</summary>
         public bool Launch(WeaponData data, Vector2 direction, Team team, Collider2D owner)
         {
-            if (data == null || data.AmmoType != AmmoType.Standard || direction.sqrMagnitude <= Mathf.Epsilon)
+            if (data == null ||
+                (data.AmmoType != AmmoType.Standard && data.AmmoType != AmmoType.Piercing) ||
+                direction.sqrMagnitude <= Mathf.Epsilon)
             {
                 return false;
             }
@@ -103,9 +98,10 @@ namespace BeanBlaster.Combat
             ownerCollider = owner;
             remainingLifetime = data.ProjectileLifetime;
             launched = true;
-            transform.right = direction.normalized;
+            launchDirection = direction.normalized;
+            transform.right = launchDirection;
             body.gravityScale = data.ProjectileGravityScale;
-            body.velocity = direction.normalized * data.ProjectileSpeed;
+            body.velocity = launchDirection * data.ProjectileSpeed;
             if (spriteRenderer != null)
             {
                 spriteRenderer.color = data.ProjectileColor;
@@ -136,7 +132,18 @@ namespace BeanBlaster.Combat
             launched = false;
             weapon = null;
             ownerCollider = null;
+            launchDirection = Vector2.zero;
             remainingLifetime = 0f;
+            foreach (Collider2D ignoredCollider in ignoredTargetColliders)
+            {
+                if (ignoredCollider != null && projectileCollider != null)
+                {
+                    Physics2D.IgnoreCollision(projectileCollider, ignoredCollider, false);
+                }
+            }
+
+            ignoredTargetColliders.Clear();
+            hitTargets.Clear();
             if (body != null)
             {
                 body.velocity = Vector2.zero;
@@ -155,6 +162,88 @@ namespace BeanBlaster.Combat
         {
             pool = ownerPool;
             PrefabKey = prefabKey;
+        }
+
+        /// <summary>Processes one collider contact. Exposed for deterministic combat verification.</summary>
+        public void ProcessCollision(Collider2D other)
+        {
+            if (!launched || weapon == null || other == null || other == ownerCollider)
+            {
+                return;
+            }
+
+            Health target = other.GetComponentInParent<Health>();
+            if (weapon.AmmoType == AmmoType.Piercing)
+            {
+                ProcessPiercingCollision(other, target);
+                return;
+            }
+
+            if (target != null)
+            {
+                TryDamage(target);
+            }
+
+            ReturnToPool();
+        }
+
+        private void ProcessPiercingCollision(Collider2D other, Health target)
+        {
+            if (target == null)
+            {
+                ReturnToPool();
+                return;
+            }
+
+            if (!hitTargets.Add(target))
+            {
+                IgnoreTargetCollider(other);
+                RestoreFlightVelocity();
+                return;
+            }
+
+            if (!TryDamage(target))
+            {
+                hitTargets.Remove(target);
+                IgnoreTargetCollider(other);
+                RestoreFlightVelocity();
+                return;
+            }
+
+            if (hitTargets.Count > weapon.PierceCount)
+            {
+                ReturnToPool();
+                return;
+            }
+
+            IgnoreTargetCollider(other);
+            RestoreFlightVelocity();
+        }
+
+        private bool TryDamage(Health target)
+        {
+            return target.TryApplyDamage(new DamageInfo(
+                weapon.Damage,
+                transform.position,
+                launchDirection.sqrMagnitude > 0f ? launchDirection : (Vector2)transform.right,
+                weapon.KnockbackForce,
+                sourceTeam,
+                DamageType.Bullet));
+        }
+
+        private void IgnoreTargetCollider(Collider2D targetCollider)
+        {
+            if (projectileCollider == null || targetCollider == null || !ignoredTargetColliders.Add(targetCollider))
+            {
+                return;
+            }
+
+            Physics2D.IgnoreCollision(projectileCollider, targetCollider, true);
+        }
+
+        private void RestoreFlightVelocity()
+        {
+            body.velocity = launchDirection * weapon.ProjectileSpeed;
         }
 
         private void ReturnToPool()
