@@ -21,6 +21,7 @@ namespace BeanBlaster.Level
         public float KillPlaneY => killPlaneY;
         public int DeathsThisAttempt { get; private set; }
         public int KillsThisAttempt { get; private set; }
+        public int CoinsCollectedThisAttempt { get; private set; }
 
         private void Awake()
         {
@@ -55,6 +56,14 @@ namespace BeanBlaster.Level
             if (enemy != null)
             {
                 KillsThisAttempt++;
+            }
+        }
+
+        public void OnCoinsCollected(int amount)
+        {
+            if (amount > 0)
+            {
+                CoinsCollectedThisAttempt += amount;
             }
         }
 
