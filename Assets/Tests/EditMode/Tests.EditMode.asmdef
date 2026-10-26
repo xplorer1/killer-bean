@@ -2,7 +2,8 @@
   "name": "BeanBlaster.Tests.EditMode",
   "rootNamespace": "BeanBlaster.Tests.EditMode",
   "references": [
-    "BeanBlaster.Runtime"
+    "BeanBlaster.Runtime",
+    "Unity.ugui"
   ],
   "includePlatforms": [
     "Editor"

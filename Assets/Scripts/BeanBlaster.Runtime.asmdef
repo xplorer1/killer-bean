@@ -3,7 +3,8 @@
   "rootNamespace": "BeanBlaster",
   "references": [
     "Unity.InputSystem",
-    "Unity.TextMeshPro"
+    "Unity.TextMeshPro",
+    "Unity.ugui"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
