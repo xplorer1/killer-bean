@@ -135,6 +135,46 @@ namespace BeanBlaster.Tests.EditMode
             Object.DestroyImmediate(magnum);
         }
 
+        [Test]
+        public void ExplosiveProjectile_DetonatesOnceOnContact()
+        {
+            WeaponData grenade = CreateGrenade();
+            GameObject enemy = CreateEnemy("Explosion Target");
+            SetHealthField(enemy.GetComponent<Health>(), "maxHealth", 200f);
+            enemy.GetComponent<Health>().ResetHealth();
+            Physics2D.SyncTransforms();
+            int explosionCount = 0;
+            prefab.Exploded += (_, __) => explosionCount++;
+            Assert.That(prefab.Launch(grenade, Vector2.right, Team.Player, null), Is.True);
+
+            prefab.ProcessCollision(enemy.GetComponent<Collider2D>());
+            InvokeLifetimeExpiry(prefab);
+
+            Assert.That(explosionCount, Is.EqualTo(1));
+            Assert.That(enemy.GetComponent<Health>().CurrentHealth, Is.EqualTo(80f).Within(0.001f));
+            Assert.That(prefab.IsLaunched, Is.False);
+            Object.DestroyImmediate(enemy);
+            Object.DestroyImmediate(grenade);
+        }
+
+        [Test]
+        public void ExplosiveProjectile_DetonatesWhenFuseExpires()
+        {
+            WeaponData grenade = CreateGrenade();
+            GameObject enemy = CreateEnemy("Fuse Target");
+            SetHealthField(enemy.GetComponent<Health>(), "maxHealth", 200f);
+            enemy.GetComponent<Health>().ResetHealth();
+            Physics2D.SyncTransforms();
+            Assert.That(prefab.Launch(grenade, Vector2.right, Team.Player, null), Is.True);
+
+            InvokeLifetimeExpiry(prefab);
+
+            Assert.That(enemy.GetComponent<Health>().CurrentHealth, Is.EqualTo(80f).Within(0.001f));
+            Assert.That(prefab.IsLaunched, Is.False);
+            Object.DestroyImmediate(enemy);
+            Object.DestroyImmediate(grenade);
+        }
+
         private static WeaponData CreateMagnum()
         {
             WeaponData weapon = ScriptableObject.CreateInstance<WeaponData>();
@@ -146,6 +186,30 @@ namespace BeanBlaster.Tests.EditMode
             SetWeaponField(weapon, "knockbackForce", 10f);
             SetWeaponField(weapon, "pierceCount", 2);
             return weapon;
+        }
+
+        private static WeaponData CreateGrenade()
+        {
+            WeaponData weapon = ScriptableObject.CreateInstance<WeaponData>();
+            SetWeaponField(weapon, "id", "explosive_gl");
+            SetWeaponField(weapon, "ammoType", AmmoType.Explosive);
+            SetWeaponField(weapon, "damage", 120f);
+            SetWeaponField(weapon, "projectileSpeed", 14f);
+            SetWeaponField(weapon, "projectileGravityScale", 1.5f);
+            SetWeaponField(weapon, "projectileLifetime", 3f);
+            SetWeaponField(weapon, "knockbackForce", 9f);
+            SetWeaponField(weapon, "aoeRadius", 3.5f);
+            SetWeaponField(weapon, "aoeEdgeDamageMultiplier", 0.4f);
+            return weapon;
+        }
+
+        private static void InvokeLifetimeExpiry(Projectile projectile)
+        {
+            MethodInfo method = typeof(Projectile).GetMethod(
+                "ResolveLifetimeExpiry",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(projectile, null);
         }
 
         private static GameObject CreateEnemy(string name)

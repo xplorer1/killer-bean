@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using BeanBlaster.Core;
 using UnityEngine;
@@ -12,6 +13,7 @@ namespace BeanBlaster.Combat
         [SerializeField] private Collider2D projectileCollider;
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private TrailRenderer trailRenderer;
+        [SerializeField] private LayerMask enemyLayerMask = 1 << 8;
 
         private ProjectilePool pool;
         private WeaponData weapon;
@@ -26,6 +28,8 @@ namespace BeanBlaster.Combat
         public int PrefabKey { get; private set; }
         public bool IsLaunched => launched;
         public int UniqueTargetsHit => hitTargets.Count;
+
+        public event Action<Vector2, float> Exploded;
 
         private void Awake()
         {
@@ -67,7 +71,7 @@ namespace BeanBlaster.Combat
             remainingLifetime -= Time.deltaTime;
             if (remainingLifetime <= 0f)
             {
-                ReturnToPool();
+                ResolveLifetimeExpiry();
             }
         }
 
@@ -85,7 +89,9 @@ namespace BeanBlaster.Combat
         public bool Launch(WeaponData data, Vector2 direction, Team team, Collider2D owner)
         {
             if (data == null ||
-                (data.AmmoType != AmmoType.Standard && data.AmmoType != AmmoType.Piercing) ||
+                (data.AmmoType != AmmoType.Standard &&
+                 data.AmmoType != AmmoType.Piercing &&
+                 data.AmmoType != AmmoType.Explosive) ||
                 direction.sqrMagnitude <= Mathf.Epsilon)
             {
                 return false;
@@ -173,6 +179,12 @@ namespace BeanBlaster.Combat
             }
 
             Health target = other.GetComponentInParent<Health>();
+            if (weapon.AmmoType == AmmoType.Explosive)
+            {
+                Detonate();
+                return;
+            }
+
             if (weapon.AmmoType == AmmoType.Piercing)
             {
                 ProcessPiercingCollision(other, target);
@@ -244,6 +256,45 @@ namespace BeanBlaster.Combat
         private void RestoreFlightVelocity()
         {
             body.velocity = launchDirection * weapon.ProjectileSpeed;
+        }
+
+        private void ResolveLifetimeExpiry()
+        {
+            if (!launched || weapon == null)
+            {
+                return;
+            }
+
+            if (weapon.AmmoType == AmmoType.Explosive)
+            {
+                Detonate();
+            }
+            else
+            {
+                ReturnToPool();
+            }
+        }
+
+        private void Detonate()
+        {
+            if (!launched || weapon == null)
+            {
+                return;
+            }
+
+            launched = false;
+            Vector2 centre = transform.position;
+            float radius = weapon.AoeRadius;
+            ExplosionUtility.Apply(
+                centre,
+                radius,
+                weapon.Damage,
+                weapon.AoeEdgeDamageMultiplier,
+                weapon.KnockbackForce,
+                sourceTeam,
+                enemyLayerMask);
+            Exploded?.Invoke(centre, radius);
+            ReturnToPool();
         }
 
         private void ReturnToPool()
