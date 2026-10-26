@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeanBlaster.Core;
+using BeanBlaster.Level;
 using UnityEngine;
 
 namespace BeanBlaster.Combat
@@ -15,6 +16,8 @@ namespace BeanBlaster.Combat
         [SerializeField] private TrailRenderer trailRenderer;
         [SerializeField] private LayerMask enemyLayerMask = 1 << 8;
         [SerializeField] private ExplosionEffect explosionEffectPrefab;
+        [SerializeField, Min(0f)] private float grenadeShakeAmplitude = 0.25f;
+        [SerializeField, Min(0f)] private float grenadeShakeDuration = 0.2f;
 
         private ProjectilePool pool;
         private WeaponData weapon;
@@ -300,6 +303,7 @@ namespace BeanBlaster.Combat
                 effect.Play(centre, radius);
             }
 
+            CameraShake.Request(grenadeShakeAmplitude, grenadeShakeDuration);
             Exploded?.Invoke(centre, radius);
             ReturnToPool();
         }
