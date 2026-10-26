@@ -175,6 +175,86 @@ namespace BeanBlaster.Tests.EditMode
             Object.DestroyImmediate(grenade);
         }
 
+        [Test]
+        public void BeamProjectile_SplitsIntoThreeReflectionsOnlyOnGround()
+        {
+            SetField("maximumPerPrefab", 5);
+            WeaponData laser = CreateLaser();
+            GameObject ground = new GameObject("Ground");
+            ground.layer = 6;
+            BoxCollider2D groundCollider = ground.AddComponent<BoxCollider2D>();
+            Projectile main = pool.Get(prefab);
+            int splitEvents = 0;
+            main.BeamSplit += (_, __) => splitEvents++;
+            Assert.That(main.Launch(laser, new Vector2(1f, -1f), Team.Player, null), Is.True);
+
+            main.ProcessBeamCollision(groundCollider, Vector2.up);
+
+            Assert.That(splitEvents, Is.EqualTo(3));
+            int launchedCount = 0;
+            foreach (Projectile projectile in poolObject.GetComponentsInChildren<Projectile>(true))
+            {
+                if (projectile.IsLaunched)
+                {
+                    launchedCount++;
+                }
+            }
+
+            Assert.That(launchedCount, Is.EqualTo(3));
+            Object.DestroyImmediate(ground);
+            Object.DestroyImmediate(laser);
+        }
+
+        [Test]
+        public void SplitBeam_NeverSplitsAgain()
+        {
+            SetField("maximumPerPrefab", 5);
+            WeaponData laser = CreateLaser();
+            GameObject ground = new GameObject("Ground");
+            ground.layer = 6;
+            BoxCollider2D groundCollider = ground.AddComponent<BoxCollider2D>();
+            Projectile main = pool.Get(prefab);
+            Assert.That(main.Launch(laser, Vector2.right, Team.Player, null), Is.True);
+            main.ProcessBeamCollision(groundCollider, Vector2.left);
+            Projectile child = null;
+            foreach (Projectile projectile in poolObject.GetComponentsInChildren<Projectile>(true))
+            {
+                if (projectile.IsLaunched)
+                {
+                    child = projectile;
+                    break;
+                }
+            }
+
+            Assert.That(child, Is.Not.Null);
+            int childSplitEvents = 0;
+            child.BeamSplit += (_, __) => childSplitEvents++;
+            child.ProcessBeamCollision(groundCollider, Vector2.left);
+
+            Assert.That(childSplitEvents, Is.Zero);
+            Assert.That(child.IsLaunched, Is.False);
+            Object.DestroyImmediate(ground);
+            Object.DestroyImmediate(laser);
+        }
+
+        [Test]
+        public void BeamProjectile_DoesNotSplitOnNonGroundGeometry()
+        {
+            WeaponData laser = CreateLaser();
+            GameObject wall = new GameObject("Wall");
+            BoxCollider2D wallCollider = wall.AddComponent<BoxCollider2D>();
+            int splitEvents = 0;
+            prefab.BeamSplit += (_, __) => splitEvents++;
+            Assert.That(prefab.Launch(laser, Vector2.right, Team.Player, null), Is.True);
+
+            prefab.ProcessBeamCollision(wallCollider, Vector2.left);
+
+            Assert.That(splitEvents, Is.Zero);
+            Assert.That(prefab.IsLaunched, Is.False);
+            Object.DestroyImmediate(wall);
+            Object.DestroyImmediate(laser);
+        }
+
         private static WeaponData CreateMagnum()
         {
             WeaponData weapon = ScriptableObject.CreateInstance<WeaponData>();
@@ -200,6 +280,21 @@ namespace BeanBlaster.Tests.EditMode
             SetWeaponField(weapon, "knockbackForce", 9f);
             SetWeaponField(weapon, "aoeRadius", 3.5f);
             SetWeaponField(weapon, "aoeEdgeDamageMultiplier", 0.4f);
+            return weapon;
+        }
+
+        private static WeaponData CreateLaser()
+        {
+            WeaponData weapon = ScriptableObject.CreateInstance<WeaponData>();
+            SetWeaponField(weapon, "id", "laser_splitter");
+            SetWeaponField(weapon, "ammoType", AmmoType.Beam);
+            SetWeaponField(weapon, "damage", 75f);
+            SetWeaponField(weapon, "projectileSpeed", 60f);
+            SetWeaponField(weapon, "projectileLifetime", 1.5f);
+            SetWeaponField(weapon, "splitCount", 3);
+            SetWeaponField(weapon, "splitAngle", 25f);
+            SetWeaponField(weapon, "subBeamDamage", 40f);
+            SetWeaponField(weapon, "subBeamLifetime", 0.75f);
             return weapon;
         }
 

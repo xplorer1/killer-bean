@@ -56,6 +56,38 @@ namespace BeanBlaster.Combat
             return created;
         }
 
+        /// <summary>Obtains another projectile from the same prefab bucket as an active pooled shot.</summary>
+        internal Projectile GetByPrefabKey(int prefabKey)
+        {
+            if (prefabKey == 0 || !buckets.TryGetValue(prefabKey, out PoolBucket bucket))
+            {
+                return null;
+            }
+
+            while (bucket.available.Count > 0)
+            {
+                Projectile candidate = bucket.available.Dequeue();
+                if (candidate == null)
+                {
+                    bucket.totalCount--;
+                    continue;
+                }
+
+                candidate.gameObject.SetActive(true);
+                return candidate;
+            }
+
+            if (bucket.totalCount >= maximumPerPrefab)
+            {
+                return null;
+            }
+
+            Projectile created = CreateInstance(bucket);
+            bucket.available.Dequeue();
+            created.gameObject.SetActive(true);
+            return created;
+        }
+
         /// <summary>Returns an active projectile to its originating prefab pool.</summary>
         public void Return(Projectile projectile)
         {

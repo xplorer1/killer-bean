@@ -15,6 +15,7 @@ namespace BeanBlaster.Combat
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private TrailRenderer trailRenderer;
         [SerializeField] private LayerMask enemyLayerMask = 1 << 8;
+        [SerializeField] private LayerMask groundLayerMask = 1 << 6;
         [SerializeField] private ExplosionEffect explosionEffectPrefab;
         [SerializeField, Min(0f)] private float grenadeShakeAmplitude = 0.25f;
         [SerializeField, Min(0f)] private float grenadeShakeDuration = 0.2f;
@@ -28,12 +29,15 @@ namespace BeanBlaster.Combat
         private Vector2 launchDirection;
         private float remainingLifetime;
         private bool launched;
+        private bool isSplitBeam;
+        private float shotDamage;
 
         public int PrefabKey { get; private set; }
         public bool IsLaunched => launched;
         public int UniqueTargetsHit => hitTargets.Count;
 
         public event Action<Vector2, float> Exploded;
+        public event Action<Vector2, Vector2> BeamSplit;
 
         private void Awake()
         {
@@ -81,6 +85,15 @@ namespace BeanBlaster.Combat
 
         private void OnCollisionEnter2D(Collision2D collision)
         {
+            if (weapon != null && weapon.AmmoType == AmmoType.Beam)
+            {
+                Vector2 normal = collision.contactCount > 0
+                    ? collision.GetContact(0).normal
+                    : -launchDirection;
+                ProcessBeamCollision(collision.collider, normal);
+                return;
+            }
+
             ProcessCollision(collision.collider);
         }
 
@@ -92,10 +105,16 @@ namespace BeanBlaster.Combat
         /// <summary>Initializes velocity, damage data, lifetime, appearance, and owner collision for one shot.</summary>
         public bool Launch(WeaponData data, Vector2 direction, Team team, Collider2D owner)
         {
+            return LaunchInternal(data, direction, team, owner, false);
+        }
+
+        private bool LaunchInternal(WeaponData data, Vector2 direction, Team team, Collider2D owner, bool splitBeam)
+        {
             if (data == null ||
                 (data.AmmoType != AmmoType.Standard &&
                  data.AmmoType != AmmoType.Piercing &&
-                 data.AmmoType != AmmoType.Explosive) ||
+                 data.AmmoType != AmmoType.Explosive &&
+                 data.AmmoType != AmmoType.Beam) ||
                 direction.sqrMagnitude <= Mathf.Epsilon)
             {
                 return false;
@@ -106,8 +125,10 @@ namespace BeanBlaster.Combat
             weapon = data;
             sourceTeam = team;
             ownerCollider = owner;
-            remainingLifetime = data.ProjectileLifetime;
+            remainingLifetime = splitBeam ? data.SubBeamLifetime : data.ProjectileLifetime;
             launched = true;
+            isSplitBeam = splitBeam;
+            shotDamage = splitBeam ? data.SubBeamDamage : data.Damage;
             launchDirection = direction.normalized;
             transform.right = launchDirection;
             body.gravityScale = data.ProjectileGravityScale;
@@ -140,6 +161,8 @@ namespace BeanBlaster.Combat
             }
 
             launched = false;
+            isSplitBeam = false;
+            shotDamage = 0f;
             weapon = null;
             ownerCollider = null;
             launchDirection = Vector2.zero;
@@ -195,12 +218,68 @@ namespace BeanBlaster.Combat
                 return;
             }
 
+            if (weapon.AmmoType == AmmoType.Beam)
+            {
+                ProcessBeamCollision(other, -launchDirection);
+                return;
+            }
+
             if (target != null)
             {
                 TryDamage(target);
             }
 
             ReturnToPool();
+        }
+
+        /// <summary>Resolves beam damage or a single Ground reflection split using the collision normal.</summary>
+        public void ProcessBeamCollision(Collider2D other, Vector2 collisionNormal)
+        {
+            if (!launched || weapon == null || weapon.AmmoType != AmmoType.Beam || other == null || other == ownerCollider)
+            {
+                return;
+            }
+
+            Health target = other.GetComponentInParent<Health>();
+            if (target != null)
+            {
+                TryDamage(target);
+                ReturnToPool();
+                return;
+            }
+
+            bool hitGround = (groundLayerMask.value & (1 << other.gameObject.layer)) != 0;
+            if (!isSplitBeam && hitGround)
+            {
+                SplitBeam(collisionNormal);
+            }
+
+            ReturnToPool();
+        }
+
+        private void SplitBeam(Vector2 collisionNormal)
+        {
+            Vector2 normal = collisionNormal.sqrMagnitude > Mathf.Epsilon
+                ? collisionNormal.normalized
+                : -launchDirection;
+            Vector2 reflected = Vector2.Reflect(launchDirection, normal).normalized;
+            int count = Mathf.Max(1, weapon.SplitCount);
+            float centre = (count - 1) * 0.5f;
+            for (int i = 0; i < count; i++)
+            {
+                float angle = (i - centre) * weapon.SplitAngle;
+                Vector2 direction = Quaternion.Euler(0f, 0f, angle) * reflected;
+                BeamSplit?.Invoke(transform.position, direction);
+
+                Projectile child = pool != null ? pool.GetByPrefabKey(PrefabKey) : null;
+                if (child == null)
+                {
+                    continue;
+                }
+
+                child.transform.position = transform.position + (Vector3)(direction * 0.05f);
+                child.LaunchInternal(weapon, direction, sourceTeam, ownerCollider, true);
+            }
         }
 
         private void ProcessPiercingCollision(Collider2D other, Health target)
@@ -239,7 +318,7 @@ namespace BeanBlaster.Combat
         private bool TryDamage(Health target)
         {
             return target.TryApplyDamage(new DamageInfo(
-                weapon.Damage,
+                shotDamage,
                 transform.position,
                 launchDirection.sqrMagnitude > 0f ? launchDirection : (Vector2)transform.right,
                 weapon.KnockbackForce,
