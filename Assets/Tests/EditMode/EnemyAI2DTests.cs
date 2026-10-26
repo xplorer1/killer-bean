@@ -91,6 +91,28 @@ namespace BeanBlaster.Tests.EditMode
             Assert.That(deaths, Is.EqualTo(1));
         }
 
+        [Test]
+        public void ContactDamage_HitsPlayerButNotEnemyAndStopsWhileStunned()
+        {
+            Health playerHealth = playerObject.GetComponent<Health>();
+            GameObject friendlyEnemy = new GameObject("Friendly Enemy");
+            friendlyEnemy.layer = 8;
+            BoxCollider2D friendlyCollider = friendlyEnemy.AddComponent<BoxCollider2D>();
+            Health friendlyHealth = friendlyEnemy.AddComponent<Health>();
+            SetHealthField(friendlyHealth, "team", Team.Enemy);
+
+            ai.ProcessContact(friendlyCollider);
+            ai.ProcessContact(playerObject.GetComponent<Collider2D>());
+            Assert.That(friendlyHealth.CurrentHealth, Is.EqualTo(100f));
+            Assert.That(playerHealth.CurrentHealth, Is.EqualTo(90f));
+
+            enemyHealth.TryApplyDamage(Hit(10f));
+            playerHealth.ResetHealth();
+            ai.ProcessContact(playerObject.GetComponent<Collider2D>());
+            Assert.That(playerHealth.CurrentHealth, Is.EqualTo(100f));
+            Object.DestroyImmediate(friendlyEnemy);
+        }
+
         private static DamageInfo Hit(float knockback)
         {
             return new DamageInfo(1f, Vector2.left, Vector2.right, knockback, Team.Player, DamageType.Bullet);

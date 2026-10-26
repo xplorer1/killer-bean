@@ -93,6 +93,35 @@ namespace BeanBlaster.Enemies
             AdvanceState(Time.fixedDeltaTime);
         }
 
+        private void OnCollisionStay2D(Collision2D collision)
+        {
+            ProcessContact(collision.collider);
+        }
+
+        /// <summary>Applies enemy contact damage only while alive and not stunned.</summary>
+        public void ProcessContact(Collider2D other)
+        {
+            if (stats == null || other == null || CurrentState == EnemyState.Stunned || CurrentState == EnemyState.Dead)
+            {
+                return;
+            }
+
+            Health target = other.GetComponentInParent<Health>();
+            if (target == null || target.Team != Team.Player)
+            {
+                return;
+            }
+
+            Vector2 direction = ((Vector2)target.transform.position - (Vector2)transform.position).normalized;
+            target.TryApplyDamage(new DamageInfo(
+                stats.ContactDamage,
+                transform.position,
+                direction,
+                stats.ContactDamage * 0.5f,
+                Team.Enemy,
+                DamageType.Contact));
+        }
+
         /// <summary>Assigns runtime dependencies for generated enemies and deterministic tests.</summary>
         public void Configure(EnemyStats enemyStats, Transform playerTarget, LevelManager manager = null)
         {
