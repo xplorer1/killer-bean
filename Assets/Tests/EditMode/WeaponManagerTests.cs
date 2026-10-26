@@ -4,6 +4,7 @@ using System.Reflection;
 using BeanBlaster.Combat;
 using BeanBlaster.Core;
 using BeanBlaster.Economy;
+using BeanBlaster.Player;
 using BeanBlaster.Save;
 using NUnit.Framework;
 using UnityEngine;
@@ -93,11 +94,67 @@ namespace BeanBlaster.Tests.EditMode
             Assert.That(displayedAmmo, Is.Zero);
         }
 
+        [Test]
+        public void DualPistolsLaunchPooledShotsFromAlternatingMuzzles()
+        {
+            GameObject projectilePrefabObject = new GameObject("Pistol Projectile Prefab");
+            projectilePrefabObject.AddComponent<Rigidbody2D>();
+            projectilePrefabObject.AddComponent<BoxCollider2D>();
+            projectilePrefabObject.AddComponent<Projectile>();
+            EconomyServiceTests.SetField(pistol, "projectilePrefab", projectilePrefabObject);
+
+            GameObject poolObject = new GameObject("Projectile Pool");
+            ProjectilePool pool = poolObject.AddComponent<ProjectilePool>();
+            GameObject socketObject = new GameObject("Fire Socket");
+            socketObject.transform.position = new Vector3(2f, 3f, 0f);
+            PlayerInputReader input = managerObject.AddComponent<PlayerInputReader>();
+            SetField("projectilePool", pool);
+            SetField("fireSocket", socketObject.transform);
+            SetField("input", input);
+            SetField("currentWeapon", pistol);
+
+            int firedCount = 0;
+            manager.Fired += _ => firedCount++;
+            InvokeTryFire();
+            InvokeTryFire();
+
+            Projectile[] instances = poolObject.GetComponentsInChildren<Projectile>(true);
+            List<Projectile> active = new List<Projectile>();
+            foreach (Projectile instance in instances)
+            {
+                if (instance.gameObject.activeSelf)
+                {
+                    active.Add(instance);
+                }
+            }
+
+            Assert.That(firedCount, Is.EqualTo(2));
+            Assert.That(active.Count, Is.EqualTo(2));
+            Assert.That(active[0].GetComponent<Rigidbody2D>().velocity.x, Is.EqualTo(22f).Within(0.001f));
+            Assert.That(active[1].GetComponent<Rigidbody2D>().velocity.x, Is.EqualTo(22f).Within(0.001f));
+            Assert.That(active[0].transform.position.y, Is.Not.EqualTo(active[1].transform.position.y));
+            float[] muzzleHeights = { active[0].transform.position.y, active[1].transform.position.y };
+            System.Array.Sort(muzzleHeights);
+            Assert.That(muzzleHeights[0], Is.EqualTo(2.92f).Within(0.001f));
+            Assert.That(muzzleHeights[1], Is.EqualTo(3.08f).Within(0.001f));
+
+            Object.DestroyImmediate(projectilePrefabObject);
+            Object.DestroyImmediate(poolObject);
+            Object.DestroyImmediate(socketObject);
+        }
+
         private void SetField(string name, object value)
         {
             FieldInfo field = typeof(WeaponManager).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(field, Is.Not.Null);
             field.SetValue(manager, value);
+        }
+
+        private void InvokeTryFire()
+        {
+            MethodInfo method = typeof(WeaponManager).GetMethod("TryFire", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(manager, null);
         }
     }
 }
